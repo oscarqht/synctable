@@ -20,6 +20,7 @@ export default {
       "src/mainview/index.html": "views/mainview/index.html",
       "src/mainview/style.css": "views/mainview/style.css",
       "docs/poster.jpeg": "views/mainview/assets/poster.jpeg",
+      "src/native/bin/dia-db-reader": "bin/dia-db-reader",
     },
     mac: {
       defaultRenderer: "native",

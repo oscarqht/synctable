@@ -58,17 +58,18 @@ All browser data models are normalized into a 5-tier recursive parent-child hier
 | **Vivaldi** | `.../User Data/<Profile>/Preferences` & Sessions | JSON / Log | Extract `workspaces`, `tab_groups`, and session `extData`. |
 | **Arc Browser** | `.../Arc/StorableSidebar.json` | JSON | Parse tree layout (spaces, folders, and split tabs). |
 | **Zen Browser** | `.../zen/Profiles/<Profile>/sessionstore.jsonlz4` | Mozilla LZ4 | Decompress `mozLz40\0` streams and extract session trees. |
+| **Dia Browser** | `.../Dia/User Data/<Profile>/tabs.db` | SQLCipher / WAL | Open the local profile databases read-only and reconstruct windows, spaces, tab groups, pinned tabs, and tabs from persisted records. |
 
 ---
 
 ## ⚙️ Architecture & Pipeline
 
 ```text
-[Timer Loop (5-15 min)] ──> [Safe File Copy] ──> [Parser Engines] ──> [Diff & Upsert DB]
+[Timer Loop (5-15 min)] ──> [Read-only Snapshot] ──> [Parser Engines] ──> [Diff & Upsert DB]
 ```
 
 1. **Background Daemon**: Periodically triggers synchronization cycles (configurable every 5–15 minutes).
-2. **Safe Snapshot Worker**: Clones live browser profile files to a staging cache (`~/.browser_sync_cache/tmp/`) to avoid file-lock conflicts and read errors.
+2. **Safe Snapshot Worker**: Clones ordinary browser state files to a staging cache (`~/.browser_sync_cache/tmp/`). Dia's SQLCipher database is opened read-only so SQLite can include its live WAL consistently.
 3. **Parser Engines**: Browser-specific parsers decompress (LZ4) and extract layout hierarchies into unified intermediate representations.
 4. **Deterministic Upsert**: Computes deterministic hash keys to cleanly upsert tree modifications into SQLite/PostgreSQL without duplicate records.
 
@@ -101,6 +102,13 @@ CREATE INDEX idx_browser_parent ON browser_trees (browser_name, parent_id);
 
 ### Prerequisites
 - [Bun](https://bun.sh) (v1.1+)
+- macOS Command Line Tools (`clang`) for the Dia database reader
+
+Dia does not need to be running for sync, and SyncTable does not use Dia's user
+interface. Dia encrypts `tabs.db`, so macOS may ask once for access to the
+existing **Dia Safe Storage** Keychain item. The helper derives each profile's
+database key in memory, opens the database read-only, and never prints or stores
+the Keychain secret or derived keys.
 
 ### Installation & Development
 ```bash
@@ -122,4 +130,3 @@ bun run build
 ## 📖 Documentation
 
 For detailed technical specifications, risk mitigations, and implementation strategies, refer to the [Product Requirements Document (PRD)](docs/PRD.md).
-
