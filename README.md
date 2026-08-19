@@ -100,11 +100,32 @@ CREATE INDEX idx_browser_parent ON browser_trees (browser_name, parent_id);
 
 ---
 
+## 📦 Monorepo Structure
+
+The project is structured as a Bun workspace monorepo:
+
+```text
+synctable/
+├── apps/
+│   ├── synctable-desktop/   # Electrobun desktop application & daemon
+│   └── synctable-web/       # Next.js 14 web app & tab tree visualizer
+├── docs/                    # Architecture documentation & assets
+├── package.json             # Monorepo workspace configuration
+└── bun.lockb
+```
+
+| Package | Description |
+| :--- | :--- |
+| **`apps/synctable-desktop`** | Lightweight Electrobun desktop app that embeds native Swift/C daemons, parser engines (Arc, Zen, Chrome, Firefox, Vivaldi, Dia), local SQLite storage, and Raindrop.io sync. |
+| **`apps/synctable-web`** | Next.js App Router web application providing an interactive dashboard and hierarchical visualizer for synced tab trees and device states. |
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites
 - [Bun](https://bun.sh) (v1.1+)
-- macOS Command Line Tools (`clang`) for the Dia database reader
+- macOS Command Line Tools (`clang` and `swiftc`) for the native readers
 
 Dia does not need to be running for sync, and SyncTable does not use Dia's user
 interface. Dia encrypts `tabs.db`, so macOS may ask once for access to the
@@ -113,18 +134,28 @@ database key in memory, opens the database read-only, and never prints or stores
 the Keychain secret or derived keys.
 
 ### Installation & Development
+
 ```bash
-# Install dependencies
+# Install dependencies across all workspace packages
 bun install
 
-# Run in development mode with live reload
-bun dev
+# Start the desktop app in development mode
+bun run dev:desktop
 
-# Typecheck TypeScript
+# Start the Next.js web application (http://localhost:3000)
+bun run dev:web
+
+# Run unit tests across all packages
+bun test
+
+# Typecheck TypeScript across all packages
 bun run typecheck
 
-# Build standalone desktop distribution
-bun run build
+# Build desktop distribution
+bun run build:desktop
+
+# Build Next.js production web app
+bun run build:web
 ```
 
 ---
