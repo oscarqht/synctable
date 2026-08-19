@@ -18,10 +18,6 @@ new Electroview({ rpc });
 let currentTrees: BrowserTreeNode[] = [];
 
 // DOM Elements
-const statWorkspaces = document.getElementById("stat-workspaces")!;
-const statFolders = document.getElementById("stat-folders")!;
-const statTabs = document.getElementById("stat-tabs")!;
-const statTotal = document.getElementById("stat-total")!;
 const lastSyncTimeEl = document.getElementById("last-sync-time")!;
 const browsersListEl = document.getElementById("browsers-list")!;
 const treeContainerEl = document.getElementById("tree-container")!;
@@ -61,11 +57,6 @@ async function loadData() {
 }
 
 function updateStats(stats: SyncStats) {
-  statWorkspaces.textContent = stats.totalWorkspaces.toLocaleString();
-  statFolders.textContent = stats.totalFolders.toLocaleString();
-  statTabs.textContent = stats.totalTabs.toLocaleString();
-  statTotal.textContent = stats.totalNodes.toLocaleString();
-
   if (stats.lastSyncTime) {
     const date = new Date(stats.lastSyncTime);
     lastSyncTimeEl.textContent = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });

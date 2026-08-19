@@ -21,6 +21,7 @@ export default {
       "src/mainview/style.css": "views/mainview/style.css",
       "docs/poster.jpeg": "views/mainview/assets/poster.jpeg",
       "src/native/bin/dia-db-reader": "bin/dia-db-reader",
+      "src/native/bin/sync-lifecycle-monitor": "bin/sync-lifecycle-monitor",
     },
     mac: {
       defaultRenderer: "native",
