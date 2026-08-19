@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import type { BrowserTreeNode } from "@/lib/types";
+import { countTabs } from "@/lib/treeUtils";
 import { ZenFolderIcon } from "./ZenFolderIcon";
 import { ZenTabItem } from "./ZenTabItem";
 import { ZenSplitViewItem } from "./ZenSplitViewItem";
@@ -24,11 +25,15 @@ export function ZenFolderItem({
   onSelectTab,
 }: ZenFolderItemProps) {
   const [isOpen, setIsOpen] = useState<boolean>(defaultExpanded);
-  const children = folder.children || [];
+  const children = (folder.children || []).filter((c) => countTabs(c) > 0);
 
   React.useEffect(() => {
     setIsOpen(defaultExpanded);
   }, [defaultExpanded]);
+
+  if (countTabs(folder) === 0 || children.length === 0) {
+    return null;
+  }
 
   if (isCompact) {
     return (

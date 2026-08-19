@@ -31,6 +31,7 @@ import type {
   SynctableSyncResponse,
   BrowserTreeNode,
 } from "@/lib/types";
+import { countTabs, countWorkspaces, pruneEmptyNodes } from "@/lib/treeUtils";
 import { TreeNodeItem } from "./components/TreeNodeItem";
 import { ZenSidebarView } from "./components/zen/ZenSidebarView";
 import { Sidebar, ListTree } from "lucide-react";
@@ -149,41 +150,64 @@ export default function Home() {
     }
   };
 
-  // Collect all unique browsers across devices
-  const availableBrowsers = useMemo(() => {
+  // Active devices with non-empty browser trees (ignoring empty devices and empty subtrees)
+  const validDevices = useMemo(() => {
     if (!syncData?.devices) return [];
+    return syncData.devices
+      .map((dev) => {
+        const prunedTree = dev.tree
+          .map(pruneEmptyNodes)
+          .filter(
+            (node): node is BrowserTreeNode =>
+              node !== null && countTabs(node) > 0
+          );
+        return {
+          ...dev,
+          tree: prunedTree,
+        };
+      })
+      .filter((dev) => dev.tree.length > 0);
+  }, [syncData]);
+
+  // Collect all unique browsers across non-empty devices
+  const availableBrowsers = useMemo(() => {
+    if (!validDevices.length) return [];
     const set = new Set<string>();
-    for (const dev of syncData.devices) {
-      for (const b of dev.stats.browsers) {
-        set.add(b.toLowerCase());
+    for (const dev of validDevices) {
+      for (const node of dev.tree) {
+        if (node.browser_name && countTabs(node) > 0) {
+          set.add(node.browser_name.toLowerCase());
+        }
       }
     }
     return Array.from(set).sort();
-  }, [syncData]);
+  }, [validDevices]);
 
-  // Aggregate stats
+  // Aggregate stats across non-empty devices
   const totalStats = useMemo(() => {
-    if (!syncData?.devices)
+    if (!validDevices.length)
       return { totalTabs: 0, totalWorkspaces: 0, totalDevices: 0 };
     let tabs = 0;
     let workspaces = 0;
-    for (const d of syncData.devices) {
-      tabs += d.stats.totalTabs;
-      workspaces += d.stats.totalWorkspaces;
+    for (const d of validDevices) {
+      for (const tree of d.tree) {
+        tabs += countTabs(tree);
+        workspaces += countWorkspaces(tree);
+      }
     }
     return {
       totalTabs: tabs,
       totalWorkspaces: workspaces,
-      totalDevices: syncData.devices.length,
+      totalDevices: validDevices.length,
     };
-  }, [syncData]);
+  }, [validDevices]);
 
   // Active devices to render
   const visibleDevices = useMemo(() => {
-    if (!syncData?.devices) return [];
-    if (selectedDeviceId === "all") return syncData.devices;
-    return syncData.devices.filter((d) => d.deviceId === selectedDeviceId);
-  }, [syncData, selectedDeviceId]);
+    if (!validDevices.length) return [];
+    if (selectedDeviceId === "all") return validDevices;
+    return validDevices.filter((d) => d.deviceId === selectedDeviceId);
+  }, [validDevices, selectedDeviceId]);
 
   return (
     <main className="min-h-screen bg-slate-50 text-slate-800 flex flex-col selection:bg-cyan-500/20 selection:text-cyan-900">
@@ -535,7 +559,7 @@ export default function Home() {
                   <span>Check Raindrop Again</span>
                 </button>
               </div>
-            ) : syncData.devices.length === 0 ? (
+            ) : validDevices.length === 0 ? (
               /* Synctable Collection Found But 0 Items */
               <div className="py-16 px-6 bg-white rounded-2xl border border-slate-200/80 text-center max-w-lg mx-auto space-y-5 shadow-xs">
                 <div className="w-14 h-14 rounded-2xl bg-cyan-50 border border-cyan-200 flex items-center justify-center text-cyan-600 mx-auto">
@@ -546,7 +570,7 @@ export default function Home() {
                     Collection &quot;Synctable&quot; is Empty
                   </h3>
                   <p className="text-xs text-slate-500">
-                    The root collection was found, but no device snapshots have
+                    The root collection was found, but no non-empty device snapshots have
                     been uploaded yet. Trigger a sync from your SyncTable desktop
                     daemon.
                   </p>
@@ -569,7 +593,7 @@ export default function Home() {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
-                      Connected Devices ({syncData.devices.length})
+                      Connected Devices ({validDevices.length})
                     </span>
                   </div>
 
@@ -593,7 +617,7 @@ export default function Home() {
                           </span>
                         </div>
                         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
-                          {syncData.devices.length}
+                          {validDevices.length}
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/50 w-full">
@@ -605,8 +629,17 @@ export default function Home() {
                     </button>
 
                     {/* Individual Device Cards */}
-                    {syncData.devices.map((device) => {
+                    {validDevices.map((device) => {
                       const isSelected = selectedDeviceId === device.deviceId;
+                      const deviceTabsCount = device.tree.reduce((acc, t) => acc + countTabs(t), 0);
+                      const deviceBrowsers = Array.from(
+                        new Set(
+                          device.tree
+                            .map((t) => t.browser_name?.toLowerCase())
+                            .filter((b): b is string => Boolean(b))
+                        )
+                      ).sort();
+
                       return (
                         <button
                           key={device.deviceId}
@@ -636,10 +669,10 @@ export default function Home() {
 
                           <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/50 w-full">
                             <span className="text-[10px] uppercase font-bold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded">
-                              {device.stats.browsers.join(", ") || "Browser"}
+                              {deviceBrowsers.join(", ") || "Browser"}
                             </span>
                             <span className="font-semibold text-slate-700">
-                              {device.stats.totalTabs} tabs
+                              {deviceTabsCount} tabs
                             </span>
                           </div>
                         </button>
@@ -770,11 +803,37 @@ export default function Home() {
                 <div className="space-y-6">
                   {visibleDevices.map((device) => {
                     const filteredRoots = device.tree.filter((node) => {
+                      if (countTabs(node) === 0) return false;
                       if (selectedBrowser !== "all" && node.browser_name) {
                         return node.browser_name.toLowerCase() === selectedBrowser.toLowerCase();
                       }
                       return true;
                     });
+
+                    const deviceTabsCount = filteredRoots.reduce((acc, r) => acc + countTabs(r), 0);
+                    const deviceWorkspacesCount = filteredRoots.reduce(
+                      (acc, r) => acc + countWorkspaces(r),
+                      0
+                    );
+                    const deviceBrowsers = Array.from(
+                      new Set(
+                        filteredRoots
+                          .map((b) => b.browser_name?.toLowerCase())
+                          .filter((b): b is string => Boolean(b))
+                      )
+                    ).sort();
+
+                    const browserGroups = (() => {
+                      const map = new Map<string, BrowserTreeNode[]>();
+                      for (const root of filteredRoots) {
+                        const bName = (root.browser_name || "browser").toLowerCase();
+                        if (!map.has(bName)) {
+                          map.set(bName, []);
+                        }
+                        map.get(bName)!.push(root);
+                      }
+                      return Array.from(map.entries());
+                    })();
 
                     return (
                       <div
@@ -796,14 +855,14 @@ export default function Home() {
                               </h2>
                               <p className="text-[10px] text-slate-500">
                                 Last synced {formatRelativeTime(device.lastUpdated)} &middot;{" "}
-                                {device.stats.totalTabs} tabs &middot;{" "}
-                                {device.stats.totalWorkspaces} workspaces
+                                {deviceTabsCount} tabs &middot;{" "}
+                                {deviceWorkspacesCount} workspaces
                               </p>
                             </div>
                           </div>
 
                           <div className="flex items-center space-x-2">
-                            {device.stats.browsers.map((b) => (
+                            {deviceBrowsers.map((b) => (
                               <span
                                 key={b}
                                 className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 shadow-2xs"
@@ -822,13 +881,30 @@ export default function Home() {
                             </div>
                           ) : viewMode === "zen_sidebar" ? (
                             /* Zen Browser Sidebar Mode */
-                            <div className="space-y-4">
-                              {filteredRoots.map((rootNode) => (
-                                <ZenSidebarView
-                                  key={rootNode.id || `${rootNode.browser_name}_${rootNode.profile_name}`}
-                                  rootNode={rootNode}
-                                  searchQuery={searchQuery}
-                                />
+                            <div className="space-y-6">
+                              {browserGroups.map(([browserName, browserTrees]) => (
+                                <div key={browserName} className="space-y-3">
+                                  {browserGroups.length > 1 && (
+                                    <div className="flex items-center gap-2 px-1">
+                                      <span className="text-xs uppercase font-bold tracking-wider text-slate-500">
+                                        {browserName}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {/* Arrange trees for the same browser horizontally as columns (single column on mobile) */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+                                    {browserTrees.map((rootNode) => (
+                                      <ZenSidebarView
+                                        key={
+                                          rootNode.id ||
+                                          `${rootNode.browser_name}_${rootNode.profile_name}`
+                                        }
+                                        rootNode={rootNode}
+                                        searchQuery={searchQuery}
+                                      />
+                                    ))}
+                                  </div>
+                                </div>
                               ))}
                             </div>
                           ) : (

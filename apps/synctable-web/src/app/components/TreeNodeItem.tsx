@@ -16,9 +16,10 @@ import {
   Compass,
 } from "lucide-react";
 import type { BrowserTreeNode, NodeType } from "@/lib/types";
+import { countTabs } from "@/lib/treeUtils";
+import { getDomain, getFaviconUrl } from "./zen/ZenTabItem";
 import { ZenFolderIcon } from "./zen/ZenFolderIcon";
 import { ZenSplitViewItem } from "./zen/ZenSplitViewItem";
-import { getDomain, getFaviconUrl } from "./zen/ZenTabItem";
 
 interface TreeNodeItemProps {
   node: BrowserTreeNode;
@@ -156,6 +157,11 @@ export function TreeNodeItem({
   React.useEffect(() => {
     setExpanded(defaultExpanded);
   }, [defaultExpanded]);
+
+  // Ignore empty tab groups / spaces / windows / containers
+  if (countTabs(node) === 0) {
+    return null;
+  }
 
   // Filter by browser if top-level root
   if (
@@ -359,17 +365,19 @@ export function TreeNodeItem({
       {/* Children Nodes (Recursive) */}
       {hasChildren && expanded && (
         <div className="flex flex-col border-l border-slate-200/70 dark:border-slate-800 ml-4 pl-1 space-y-0.5">
-          {node.children!.map((child) => (
-            <TreeNodeItem
-              key={child.id || `${child.node_type}_${child.sort_order}_${child.title}`}
-              node={child}
-              searchQuery={searchQuery}
-              depth={depth + 1}
-              browserFilter={browserFilter}
-              nodeTypeFilter={nodeTypeFilter}
-              defaultExpanded={defaultExpanded}
-            />
-          ))}
+          {node.children!
+            .filter((child) => countTabs(child) > 0)
+            .map((child) => (
+              <TreeNodeItem
+                key={child.id || `${child.node_type}_${child.sort_order}_${child.title}`}
+                node={child}
+                searchQuery={searchQuery}
+                depth={depth + 1}
+                browserFilter={browserFilter}
+                nodeTypeFilter={nodeTypeFilter}
+                defaultExpanded={defaultExpanded}
+              />
+            ))}
         </div>
       )}
     </div>

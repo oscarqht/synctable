@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Columns, ExternalLink, Copy, Check } from "lucide-react";
 import type { BrowserTreeNode } from "@/lib/types";
+import { isValidHttpUrl, countTabs } from "@/lib/treeUtils";
 import { getDomain, getFaviconUrl } from "./ZenTabItem";
 
 interface ZenSplitViewItemProps {
@@ -17,7 +18,11 @@ export function ZenSplitViewItem({
   onSelectTab,
 }: ZenSplitViewItemProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const children = node.children || [];
+  const children = (node.children || []).filter((c) => isValidHttpUrl(c.url));
+
+  if (countTabs(node) === 0 || children.length === 0) {
+    return null;
+  }
 
   const handleCopyUrl = (e: React.MouseEvent, tab: BrowserTreeNode) => {
     e.stopPropagation();

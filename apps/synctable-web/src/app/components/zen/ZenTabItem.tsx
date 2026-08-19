@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Copy, Check, ExternalLink } from "lucide-react";
 import type { BrowserTreeNode } from "@/lib/types";
+import { isValidHttpUrl } from "@/lib/treeUtils";
 
 interface ZenTabItemProps {
   tab: BrowserTreeNode;
@@ -13,17 +14,17 @@ interface ZenTabItemProps {
 }
 
 export function getDomain(urlStr: string | null): string {
-  if (!urlStr) return "";
+  if (!urlStr || !isValidHttpUrl(urlStr)) return "";
   try {
     const url = new URL(urlStr);
     return url.hostname.replace(/^www\./, "");
   } catch {
-    return urlStr;
+    return "";
   }
 }
 
 export function getFaviconUrl(urlStr: string | null): string {
-  if (!urlStr) return "";
+  if (!urlStr || !isValidHttpUrl(urlStr)) return "";
   try {
     const url = new URL(urlStr);
     return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=64`;
@@ -41,6 +42,10 @@ export function ZenTabItem({
 }: ZenTabItemProps) {
   const [copied, setCopied] = useState(false);
   const [imgError, setImgError] = useState(false);
+
+  if (!isValidHttpUrl(tab.url)) {
+    return null;
+  }
 
   const domain = getDomain(tab.url);
   const favicon = getFaviconUrl(tab.url);
