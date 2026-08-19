@@ -46,6 +46,7 @@ All browser data models are normalized into a 5-tier recursive parent-child hier
 | **`Window`** | OS-level application window container. |
 | **`Workspace`** | Named space / workspace context (e.g., Arc Spaces, Vivaldi Workspaces). |
 | **`Folder`** | Arbitrarily nested group container (Chrome Tab Groups, Vivaldi Stacks, Arc Folders). |
+| **`Split View`** | Arc-only, non-nestable container for tabs displayed side by side. |
 | **`Tab`** | Individual regular or pinned web page with title and URL. |
 
 ---
@@ -85,7 +86,7 @@ CREATE TABLE browser_trees (
     browser_name VARCHAR(50) NOT NULL,    -- 'chrome', 'vivaldi', 'arc', 'zen', etc.
     os_type VARCHAR(50) NOT NULL,         -- 'macos', 'windows', 'linux'
     profile_name VARCHAR(100) NOT NULL,   -- e.g., 'Default', 'Profile 1'
-    node_type VARCHAR(50) NOT NULL,       -- 'root', 'window', 'workspace', 'folder', 'tab', 'pinned_tab'
+    node_type VARCHAR(50) NOT NULL,       -- 'root', 'window', 'workspace', 'folder', 'split_view', 'tab', 'pinned_tab'
     title TEXT,                           -- Title of window, workspace, folder, or tab
     url TEXT,                             -- NULL for containers; URL string for tabs
     parent_id VARCHAR(255),               -- Recursive pointer to containing entity

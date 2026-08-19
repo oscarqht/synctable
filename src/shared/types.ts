@@ -1,6 +1,6 @@
 import type { ElectrobunRPCSchema } from "electrobun/bun";
 
-export type NodeType = "root" | "window" | "workspace" | "folder" | "tab" | "pinned_tab";
+export type NodeType = "root" | "window" | "workspace" | "folder" | "split_view" | "tab" | "pinned_tab";
 export type BrowserName = "chrome" | "vivaldi" | "arc" | "zen" | "dia" | "safari" | "edge" | string;
 export type OSType = "macos" | "windows" | "linux";
 

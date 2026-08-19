@@ -115,8 +115,32 @@ export function parseArcSidebar(options: ArcParserOptions): BrowserTreeNode[] {
           return;
         }
         const itemIdForTree = `arc-item-${arcId(item.id ?? itemId, itemId)}`;
-        if (kind === "list" || kind === "tabGroup" || kind === "splitView" || children.length > 0) {
-          addNode({ id: itemIdForTree, node_type: "folder", title: item.title || item.data?.tabGroup?.title || (kind === "splitView" ? "Split View" : "Folder"), url: null, parent_id: parentId, sort_order: sortOrder });
+        if (kind === "splitView") {
+          // Arc split views are a non-nestable collection of the tabs displayed
+          // together. Keep that semantic distinction instead of treating them
+          // as folders, and do not admit a nested folder into the collection.
+          addNode({ id: itemIdForTree, node_type: "split_view", title: item.title || "Split View", url: null, parent_id: parentId, sort_order: sortOrder });
+          children.forEach((child, index) => {
+            const childItem = items.get(child);
+            if (!childItem || itemKind(childItem) !== "tab" || visited.has(child)) return;
+            // Insert the child directly rather than recursing: even malformed
+            // sidebar data cannot make a split view contain a nested container.
+            visited.add(child);
+            const tab = childItem.data?.tab ?? {};
+            const url = tab.savedURL || tab.url || childItem.url || childItem.data?.url || null;
+            addNode({
+              id: `arc-item-${arcId(childItem.id ?? child, child)}`,
+              node_type: pinned || tab.pinned || childItem.isPinned ? "pinned_tab" : "tab",
+              title: childItem.title || tab.savedTitle || childItem.data?.title || url || "Tab",
+              url,
+              parent_id: itemIdForTree,
+              sort_order: index,
+            });
+          });
+          return;
+        }
+        if (kind === "list" || kind === "tabGroup" || children.length > 0) {
+          addNode({ id: itemIdForTree, node_type: "folder", title: item.title || item.data?.tabGroup?.title || "Folder", url: null, parent_id: parentId, sort_order: sortOrder });
           children.forEach((child, index) => walk(child, itemIdForTree, index, pinned));
           return;
         }

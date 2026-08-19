@@ -24,6 +24,7 @@ The unified hierarchy normalizes disparate browser concepts into 5 core entity t
 | **Window** | An OS-level browser window instance containing one or more workspaces. | `id`, `parent_id` (points to Root), `title`, `sort_order` |
 | **Workspace** | A named workspace, space, or profile context within a window (or a default space for browsers without native workspaces). | `id`, `parent_id` (points to Window), `title`, `sort_order` |
 | **Folder** | A container grouping tabs or nested folders (maps to Tab Groups in Chrome, Tab Stacks in Vivaldi, Folders in Arc/Zen). | `id`, `parent_id` (points to Workspace or parent Folder), `title`, `sort_order` |
+| **Split View** | An Arc-only container for the tabs rendered together in a split view; it cannot contain folders. | `id`, `parent_id`, `title`, `sort_order` |
 | **Tab** | A leaf node representing an individual web page (regular or pinned). | `id`, `parent_id` (points to Workspace or Folder), `title`, `url`, `node_type` (`tab` / `pinned_tab`), `sort_order` |
 
 ### 2.2 Hierarchical Relationship Model
@@ -56,7 +57,7 @@ CREATE TABLE browser_trees (
     browser_name VARCHAR(50) NOT NULL,    -- 'chrome', 'vivaldi', 'arc', 'zen', etc.
     os_type VARCHAR(50) NOT NULL,         -- 'macos', 'windows', 'linux'
     profile_name VARCHAR(100) NOT NULL,   -- e.g., 'Default', 'Profile 1'
-    node_type VARCHAR(50) NOT NULL,       -- 'root', 'window', 'workspace', 'folder', 'tab', 'pinned_tab'
+    node_type VARCHAR(50) NOT NULL,       -- 'root', 'window', 'workspace', 'folder', 'split_view', 'tab', 'pinned_tab'
     title TEXT,                           -- Title of window, workspace, folder, or tab
     url TEXT,                             -- NULL for containers; URL string for tabs
     parent_id VARCHAR(255),               -- Recursive pointer to the containing entity (NULL for Root)
