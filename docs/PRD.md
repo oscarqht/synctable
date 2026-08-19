@@ -24,7 +24,7 @@ The unified hierarchy normalizes disparate browser concepts into 5 core entity t
 | **Window** | An OS-level browser window instance containing one or more workspaces. | `id`, `parent_id` (points to Root), `title`, `sort_order` |
 | **Workspace** | A named workspace, space, or profile context within a window (or a default space for browsers without native workspaces). | `id`, `parent_id` (points to Window), `title`, `sort_order` |
 | **Folder** | A container grouping tabs or nested folders (maps to Tab Groups in Chrome, Tab Stacks in Vivaldi, Folders in Arc/Zen). | `id`, `parent_id` (points to Workspace or parent Folder), `title`, `sort_order` |
-| **Split View** | An Arc-only container for the tabs rendered together in a split view; it cannot contain folders. | `id`, `parent_id`, `title`, `sort_order` |
+| **Split View** | A non-nestable container for Arc split views and Vivaldi tiled tabs rendered together; it cannot contain folders. | `id`, `parent_id`, `title`, `sort_order` |
 | **Tab** | A leaf node representing an individual web page (regular or pinned). | `id`, `parent_id` (points to Workspace or Folder), `title`, `url`, `node_type` (`tab` / `pinned_tab`), `sort_order` |
 
 ### 2.2 Hierarchical Relationship Model

@@ -9,7 +9,7 @@ export interface VivaldiParserOptions {
   snapshotTime: string;
 }
 
-type SessionTab = { id: number; windowId?: number; index: number; url?: string; title?: string; pinned: boolean; groupId?: string; groupTitle?: string; workspaceId?: string; vivaldiGroup?: boolean };
+type SessionTab = { id: number; windowId?: number; index: number; url?: string; title?: string; pinned: boolean; groupId?: string; groupTitle?: string; workspaceId?: string; tiling?: { id: string; index: number }; vivaldiGroup?: boolean };
 type TabGroup = { id: string; title: string };
 const SESSION_MAGIC = "SNSS";
 
@@ -86,7 +86,7 @@ function parseSessionSnapshot(sessionFilePath?: string): { tabs: SessionTab[]; g
       const json = readPickleString(payload, 8);
       if (!json) continue;
       try {
-        const data = JSON.parse(json) as { fixedTitle?: unknown; group?: unknown; fixedGroupTitle?: unknown; workspaceId?: unknown };
+        const data = JSON.parse(json) as { fixedTitle?: unknown; group?: unknown; fixedGroupTitle?: unknown; workspaceId?: unknown; tiling?: { id?: unknown; index?: unknown } };
         if (typeof data.fixedTitle === "string" && data.fixedTitle) value.title = data.fixedTitle;
         // Vivaldi writes the complete current tab-data object. Therefore an omitted
         // group/title clears an older value in the append-only session log.
@@ -98,6 +98,11 @@ function parseSessionSnapshot(sessionFilePath?: string): { tabs: SessionTab[]; g
         // workspace; it must not fall through to the first named workspace.
         value.workspaceId = typeof data.workspaceId === "string" || typeof data.workspaceId === "number"
           ? String(data.workspaceId)
+          : undefined;
+        // Tiled tabs share a tiling ID. The index is their visual position in the
+        // split layout, which can differ from their order in the tab strip.
+        value.tiling = typeof data.tiling?.id === "string" && data.tiling.id && typeof data.tiling.index === "number" && Number.isFinite(data.tiling.index)
+          ? { id: data.tiling.id, index: data.tiling.index }
           : undefined;
       } catch {
         // This command may contain non-Vivaldi tab data. It is safe to ignore.
@@ -163,9 +168,26 @@ export function parseVivaldiPreferences(options: VivaldiParserOptions): BrowserT
       });
     const groupNodeId = (groupId: string) => `vivaldi-${profileName}-win-${sourceWindowId}-group-${groupId}`;
     groups.forEach(({ group, workspaceId, firstTabIndex }) => nodes.push({ id: groupNodeId(group.id), browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "folder", title: group.title, url: null, parent_id: workspaceId, sort_order: firstTabIndex, snapshot_time: snapshotTime }));
+    const windowSplitIds = new Set(windowTabs.flatMap((item) => item.tiling ? [item.tiling.id] : []));
+    const splits = [...windowSplitIds].map((splitId) => {
+      const splitTabs = windowTabs.filter((item) => item.tiling?.id === splitId);
+      return {
+        id: splitId,
+        workspaceId: workspaceNodeId(splitTabs[0]?.workspaceId),
+        firstTabIndex: Math.min(...splitTabs.map((item) => item.index)),
+      };
+    });
+    const splitNodeId = (splitId: string) => `vivaldi-${profileName}-win-${sourceWindowId}-split-${splitId}`;
+    splits.forEach((split) => nodes.push({ id: splitNodeId(split.id), browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "split_view", title: "Split View", url: null, parent_id: split.workspaceId, sort_order: split.firstTabIndex, snapshot_time: snapshotTime }));
     windowTabs.sort((left, right) => left.index - right.index || left.id - right.id).forEach((item) => {
-      const parentId = item.groupId && windowGroupIds.has(item.groupId) ? groupNodeId(item.groupId) : workspaceNodeId(item.workspaceId);
-      nodes.push({ id: `vivaldi-${profileName}-tab-${item.id}`, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: item.pinned ? "pinned_tab" : "tab", title: item.title || tabTitle(item.url!), url: item.url!, parent_id: parentId, sort_order: item.index, snapshot_time: snapshotTime });
+      // A tiled set is a non-nestable split view, like Arc's split views. Prefer
+      // it over a stack if a tab belongs to both Vivaldi structures.
+      const parentId = item.tiling
+        ? splitNodeId(item.tiling.id)
+        : item.groupId && windowGroupIds.has(item.groupId)
+          ? groupNodeId(item.groupId)
+          : workspaceNodeId(item.workspaceId);
+      nodes.push({ id: `vivaldi-${profileName}-tab-${item.id}`, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: item.pinned ? "pinned_tab" : "tab", title: item.title || tabTitle(item.url!), url: item.url!, parent_id: parentId, sort_order: item.tiling?.index ?? item.index, snapshot_time: snapshotTime });
     });
   });
   return nodes;

@@ -46,7 +46,7 @@ All browser data models are normalized into a 5-tier recursive parent-child hier
 | **`Window`** | OS-level application window container. |
 | **`Workspace`** | Named space / workspace context (e.g., Arc Spaces, Vivaldi Workspaces). |
 | **`Folder`** | Arbitrarily nested group container (Chrome Tab Groups, Vivaldi Stacks, Arc Folders). |
-| **`Split View`** | Arc-only, non-nestable container for tabs displayed side by side. |
+| **`Split View`** | Non-nestable container for Arc split views and Vivaldi tiled tabs displayed side by side. |
 | **`Tab`** | Individual regular or pinned web page with title and URL. |
 
 ---
