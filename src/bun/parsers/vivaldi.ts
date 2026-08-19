@@ -171,17 +171,20 @@ export function parseVivaldiPreferences(options: VivaldiParserOptions): BrowserT
     const windowSplitIds = new Set(windowTabs.flatMap((item) => item.tiling ? [item.tiling.id] : []));
     const splits = [...windowSplitIds].map((splitId) => {
       const splitTabs = windowTabs.filter((item) => item.tiling?.id === splitId);
+      const containingGroupIds = new Set(splitTabs.flatMap((item) => item.groupId ? [item.groupId] : []));
       return {
         id: splitId,
-        workspaceId: workspaceNodeId(splitTabs[0]?.workspaceId),
+        parentId: containingGroupIds.size === 1 && windowGroupIds.has([...containingGroupIds][0])
+          ? groupNodeId([...containingGroupIds][0])
+          : workspaceNodeId(splitTabs[0]?.workspaceId),
         firstTabIndex: Math.min(...splitTabs.map((item) => item.index)),
       };
     });
     const splitNodeId = (splitId: string) => `vivaldi-${profileName}-win-${sourceWindowId}-split-${splitId}`;
-    splits.forEach((split) => nodes.push({ id: splitNodeId(split.id), browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "split_view", title: "Split View", url: null, parent_id: split.workspaceId, sort_order: split.firstTabIndex, snapshot_time: snapshotTime }));
+    splits.forEach((split) => nodes.push({ id: splitNodeId(split.id), browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "split_view", title: "Split View", url: null, parent_id: split.parentId, sort_order: split.firstTabIndex, snapshot_time: snapshotTime }));
     windowTabs.sort((left, right) => left.index - right.index || left.id - right.id).forEach((item) => {
-      // A tiled set is a non-nestable split view, like Arc's split views. Prefer
-      // it over a stack if a tab belongs to both Vivaldi structures.
+      // A tiled set can be nested inside one tab stack. Tabs remain direct
+      // children of the split view rather than being duplicated in the stack.
       const parentId = item.tiling
         ? splitNodeId(item.tiling.id)
         : item.groupId && windowGroupIds.has(item.groupId)

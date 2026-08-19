@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync } from "node
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
 import type { BrowserTreeNode, OSType, SyncResult, SyncStats } from "../shared/types";
-import { parseArcSidebar, parseChromePreferences, parseDiaTree, parseVivaldiPreferences, parseZenSessionstore } from "./parsers";
+import { parseArcSidebar, parseChromePreferences, parseDiaTree, parseFirefoxSessionstore, parseVivaldiPreferences, parseZenSessionstore } from "./parsers";
 import type { SyncTableDB } from "./db";
 
 export class BrowserSyncManager {
@@ -100,6 +100,23 @@ export class BrowserSyncManager {
         }
       }
 
+      // Firefox stores both the closed-session snapshot and its current live
+      // recovery state in Mozilla's jsonlz4 format. Prefer recovery while it
+      // exists so all open windows and their tab ordering are current.
+      const firefoxProfilesDir = join(appSupport, "Firefox", "Profiles");
+      if (existsSync(firefoxProfilesDir)) {
+        for (const entry of readdirSync(firefoxProfilesDir, { withFileTypes: true })) {
+          if (!entry.isDirectory()) continue;
+          const profileDir = join(firefoxProfilesDir, entry.name);
+          const recoveryPath = join(profileDir, "sessionstore-backups", "recovery.jsonlz4");
+          const sessionPath = join(profileDir, "sessionstore.jsonlz4");
+          const sourcePath = existsSync(recoveryPath) ? recoveryPath : sessionPath;
+          if (existsSync(sourcePath)) {
+            profiles.push({ browser: "firefox", displayName: "Firefox", profileName: entry.name, sourcePath });
+          }
+        }
+      }
+
       // Dia stores its complete hierarchy in encrypted per-profile tabs.db
       // files. The local reader opens those databases read-only with the key
       // derived from Dia Safe Storage in macOS Keychain.
@@ -173,6 +190,13 @@ export class BrowserSyncManager {
             profileName: prof.profileName,
             snapshotTime: timestamp,
           });
+        } else if (prof.browser === "firefox") {
+          nodes = parseFirefoxSessionstore({
+            filePath: safeTmpFile,
+            osType: this.osType,
+            profileName: prof.profileName,
+            snapshotTime: timestamp,
+          });
         }
 
         if (nodes.length > 0) {
@@ -198,6 +222,7 @@ export class BrowserSyncManager {
 
     const browsers = [
       { name: "chrome", displayName: "Google Chrome" },
+      { name: "firefox", displayName: "Firefox" },
       { name: "arc", displayName: "Arc Browser" },
       { name: "vivaldi", displayName: "Vivaldi" },
       { name: "zen", displayName: "Zen Browser" },

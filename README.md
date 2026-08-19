@@ -56,6 +56,7 @@ All browser data models are normalized into a 5-tier recursive parent-child hier
 | Browser | Target Profile Path | Storage Format | Extraction Method |
 | :--- | :--- | :--- | :--- |
 | **Google Chrome** | `.../User Data/<Profile>/Preferences` | JSON | Parse `tab_groups` definitions and tab ordering. |
+| **Firefox** | `.../Firefox/Profiles/<Profile>/sessionstore-backups/recovery.jsonlz4` | Mozilla LZ4 | Read current windows, pinned tabs, tab groups, split views, and visual tab order. |
 | **Vivaldi** | `.../User Data/<Profile>/Preferences` & Sessions | JSON / Log | Extract `workspaces`, `tab_groups`, and session `extData`. |
 | **Arc Browser** | `.../Arc/StorableSidebar.json` | JSON | Parse tree layout (spaces, folders, and split tabs). |
 | **Zen Browser** | `.../zen/Profiles/<Profile>/sessionstore.jsonlz4` | Mozilla LZ4 | Decompress `mozLz40\0` streams and extract session trees. |

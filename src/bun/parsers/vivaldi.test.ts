@@ -110,7 +110,7 @@ describe("parseVivaldiPreferences", () => {
     expect(nodes.some((node) => node.url === "https://example.com/first")).toBe(false);
   });
 
-  test("groups Vivaldi tiled tabs in a split view", () => {
+  test("nests Vivaldi tiled tabs in a split view inside their shared tab stack", () => {
     const dir = mkdtempSync(join(tmpdir(), "synctable-vivaldi-"));
     tempDirs.push(dir);
     const preferences = join(dir, "Preferences");
@@ -119,14 +119,15 @@ describe("parseVivaldiPreferences", () => {
     writeFileSync(session, Buffer.concat([
       Buffer.from([0x53, 0x4e, 0x53, 0x53, 3, 0, 0, 0]),
       command(0, Buffer.from([10, 0, 0, 0, 41, 0, 0, 0])), command(2, Buffer.from([41, 0, 0, 0, 0, 0, 0, 0])),
-      navigation(41, "https://left.example"), tabData(41, { tiling: { id: "split-id", index: 1, layout: "row", type: "selection" } }),
+      navigation(41, "https://left.example"), tabData(41, { group: "stack-id", fixedGroupTitle: "Research", tiling: { id: "split-id", index: 1, layout: "row", type: "selection" } }),
       command(0, Buffer.from([10, 0, 0, 0, 42, 0, 0, 0])), command(2, Buffer.from([42, 0, 0, 0, 1, 0, 0, 0])),
-      navigation(42, "https://right.example"), tabData(42, { tiling: { id: "split-id", index: 0, layout: "row", type: "selection" } }),
+      navigation(42, "https://right.example"), tabData(42, { group: "stack-id", fixedGroupTitle: "Research", tiling: { id: "split-id", index: 0, layout: "row", type: "selection" } }),
     ]));
 
     const nodes = parseVivaldiPreferences({ filePath: preferences, sessionFilePath: session, osType: "macos", profileName: "Default", snapshotTime: "now" });
+    const stack = nodes.find((node) => node.node_type === "folder" && node.title === "Research");
     const splitView = nodes.find((node) => node.node_type === "split_view");
-    expect(splitView).toMatchObject({ title: "Split View", parent_id: expect.stringContaining("ws-default") });
+    expect(splitView).toMatchObject({ title: "Split View", parent_id: stack?.id });
     expect(nodes.filter((node) => node.parent_id === splitView?.id).sort((left, right) => left.sort_order - right.sort_order).map((node) => node.url)).toEqual(["https://right.example", "https://left.example"]);
   });
 

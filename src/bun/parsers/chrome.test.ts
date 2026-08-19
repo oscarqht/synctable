@@ -33,6 +33,14 @@ function splitTab(tabId: number, splitToken: Buffer, hasSplit = true) {
   return command(36, payload);
 }
 
+function groupTab(tabId: number, groupToken: Buffer) {
+  return command(25, Buffer.concat([
+    Buffer.from([tabId, 0, 0, 0, 0, 0, 0, 0]),
+    groupToken,
+    Buffer.from([1, 0, 0, 0, 0, 0, 0, 0]),
+  ]));
+}
+
 describe("parseChromePreferences", () => {
   test("imports Chrome session windows, tabs, pins, and current tab groups", () => {
     const dir = mkdtempSync(join(tmpdir(), "synctable-chrome-"));
@@ -60,7 +68,7 @@ describe("parseChromePreferences", () => {
     expect(nodes.find((node) => node.url === "https://example.com")?.parent_id).toContain("win-10-ws-default");
   });
 
-  test("groups Chrome split-view tabs under a split view", () => {
+  test("nests a Chrome split view inside its shared tab group", () => {
     const dir = mkdtempSync(join(tmpdir(), "synctable-chrome-"));
     tempDirs.push(dir);
     const preferences = join(dir, "Preferences");
@@ -69,15 +77,23 @@ describe("parseChromePreferences", () => {
     const splitToken = Buffer.alloc(16);
     splitToken.writeBigUInt64LE(11n, 0);
     splitToken.writeBigUInt64LE(22n, 8);
+    const groupToken = Buffer.alloc(16);
+    groupToken.writeBigUInt64LE(31n, 0);
+    groupToken.writeBigUInt64LE(32n, 8);
+    const metadata = Buffer.alloc(20 + 4 + "Research".length * 2);
+    groupToken.copy(metadata, 4);
+    metadata.writeInt32LE("Research".length, 20);
+    metadata.write("Research", 24, "utf16le");
     writeFileSync(session, Buffer.concat([
       Buffer.from([0x53, 0x4e, 0x53, 0x53, 3, 0, 0, 0]),
-      command(0, Buffer.from([10, 0, 0, 0, 41, 0, 0, 0])), command(2, Buffer.from([41, 0, 0, 0, 0, 0, 0, 0])), navigation(41, "https://left.example"), splitTab(41, splitToken),
-      command(0, Buffer.from([10, 0, 0, 0, 42, 0, 0, 0])), command(2, Buffer.from([42, 0, 0, 0, 1, 0, 0, 0])), navigation(42, "https://right.example"), splitTab(42, splitToken),
+      command(0, Buffer.from([10, 0, 0, 0, 41, 0, 0, 0])), command(2, Buffer.from([41, 0, 0, 0, 0, 0, 0, 0])), navigation(41, "https://left.example"), groupTab(41, groupToken), splitTab(41, splitToken),
+      command(0, Buffer.from([10, 0, 0, 0, 42, 0, 0, 0])), command(2, Buffer.from([42, 0, 0, 0, 1, 0, 0, 0])), navigation(42, "https://right.example"), groupTab(42, groupToken), splitTab(42, splitToken), command(27, metadata),
     ]));
 
     const nodes = parseChromePreferences({ filePath: preferences, sessionFilePath: session, osType: "macos", profileName: "Default", snapshotTime: "now" });
+    const group = nodes.find((node) => node.node_type === "folder" && node.title === "Research");
     const splitView = nodes.find((node) => node.node_type === "split_view");
-    expect(splitView).toMatchObject({ title: "Split View", parent_id: expect.stringContaining("ws-default") });
+    expect(splitView).toMatchObject({ title: "Split View", parent_id: group?.id });
     expect(nodes.filter((node) => node.parent_id === splitView?.id).map((node) => node.url)).toEqual(["https://left.example", "https://right.example"]);
   });
 

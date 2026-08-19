@@ -78,6 +78,7 @@ CREATE INDEX idx_browser_parent ON browser_trees (browser_name, parent_id);
 | **Vivaldi** | `.../Vivaldi/User Data/<Profile>/Preferences` & Sessions log | JSON / Sessions Log | Parse JSON under `vivaldi` &rarr; `workspaces` and `vivaldi` &rarr; `tab_groups`. Extract tabs from adjacent Sessions log where `extData` JSON string maps tabs back to group IDs. |
 | **Arc Browser** | `.../Arc/StorableSidebar.json` | JSON | Parse standard JSON containing complete workspace, folder, and tab layout explicitly mapping tree objects without needing live memory queries. |
 | **Zen Browser** | `.../zen/Profiles/<Profile>/sessionstore.jsonlz4` | Mozilla LZ4 (`jsonlz4`) | 1. Strip the custom 8-byte Mozilla magic header (`mozLz40\0`).<br>2. Decompress payload via standard LZ4 algorithm to obtain JSON string.<br>3. Traverse active structural arrays to extract folders, workspaces, and tab trees. |
+| **Firefox** | `.../Firefox/Profiles/<Profile>/sessionstore-backups/recovery.jsonlz4` | Mozilla LZ4 (`jsonlz4`) | Prefer the running-session recovery snapshot; preserve window order, pins, tab-group membership, split-view collections, and tab order. |
 
 ---
 

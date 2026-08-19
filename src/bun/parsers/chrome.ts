@@ -155,12 +155,21 @@ export function parseChromePreferences(options: ChromeParserOptions): BrowserTre
     const splitNodeId = (splitId: string) => `chrome-${profileName}-win-${sourceWindowId}-split-${splitId}`;
     for (const splitId of splitIds) {
       const firstTabIndex = Math.min(...windowTabs.filter((item) => item.splitId === splitId).map((item) => item.index));
-      nodes.push({ id: splitNodeId(splitId), browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "split_view", title: "Split View", url: null, parent_id: workspaceId, sort_order: firstTabIndex, snapshot_time: snapshotTime });
+      const containingGroupIds = new Set(windowTabs
+        .filter((item) => item.splitId === splitId)
+        .flatMap((item) => item.groupId ? [item.groupId] : []));
+      // A split nested inside one Chrome tab group belongs to that group. A
+      // split spanning ungrouped or differently grouped tabs has no unique
+      // folder parent, so it remains directly under the workspace.
+      const parentId = containingGroupIds.size === 1
+        ? `chrome-${profileName}-group-${[...containingGroupIds][0]}`
+        : workspaceId;
+      nodes.push({ id: splitNodeId(splitId), browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "split_view", title: "Split View", url: null, parent_id: parentId, sort_order: firstTabIndex, snapshot_time: snapshotTime });
     }
 
     windowTabs.sort((left, right) => left.index - right.index || left.id - right.id).forEach((item) => {
-      // Split views are a non-nestable tab collection. Prefer that structure
-      // when a split tab also belongs to a regular tab group.
+      // Split views can be nested within a tab group, but tabs themselves
+      // remain direct children of the split-view collection.
       const parentId = item.splitId && splitIds.has(item.splitId)
         ? splitNodeId(item.splitId)
         : item.groupId && groupIds.has(item.groupId)
