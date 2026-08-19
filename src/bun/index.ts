@@ -1,4 +1,4 @@
-import { BrowserWindow, defineElectrobunRPC } from "electrobun/bun";
+import { BrowserView, BrowserWindow, defineElectrobunRPC } from "electrobun/bun";
 import { SyncTableDB } from "./db";
 import { BrowserSyncManager } from "./sync";
 import type { SyncTableRPCSchema } from "../shared/types";
@@ -61,12 +61,24 @@ const saveWindowSize = (event: unknown) => {
 win.on("resize", saveWindowSize);
 win.on("close", () => db.setWindowSize(win.getSize().width, win.getSize().height));
 
+function syncAndNotify() {
+  const result = syncManager.runSync();
+  // The renderer performs the same reload after a manual Sync Now. Send the
+  // matching event for daemon syncs so new/closed windows appear without a restart.
+  const mainView = BrowserView.getById(win.webviewId);
+  mainView?.rpc?.send.syncComplete(result);
+  return result;
+}
+
+// Start from a fresh local snapshot instead of waiting for the first interval.
+syncAndNotify();
+
 // Background sync loop (10 minutes)
 const SYNC_INTERVAL_MS = 10 * 60 * 1000;
 setInterval(() => {
   try {
     console.log("[SyncTable Daemon] Starting periodic background sync...");
-    const result = syncManager.runSync();
+    const result = syncAndNotify();
     console.log(`[SyncTable Daemon] Auto-sync complete (${result.syncedNodesCount} nodes).`);
   } catch (err) {
     console.error("[SyncTable Daemon] Auto-sync error:", err);

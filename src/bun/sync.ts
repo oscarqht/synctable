@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, copyFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
 import type { BrowserTreeNode, OSType, SyncResult, SyncStats } from "../shared/types";
@@ -24,9 +24,9 @@ export class BrowserSyncManager {
     return "linux";
   }
 
-  public getBrowserProfiles(): { browser: string; displayName: string; profileName: string; sourcePath: string }[] {
+  public getBrowserProfiles(): { browser: string; displayName: string; profileName: string; sourcePath: string; sessionPath?: string }[] {
     const home = homedir();
-    const profiles: { browser: string; displayName: string; profileName: string; sourcePath: string }[] = [];
+    const profiles: { browser: string; displayName: string; profileName: string; sourcePath: string; sessionPath?: string }[] = [];
 
     if (this.osType === "macos") {
       const appSupport = join(home, "Library", "Application Support");
@@ -52,10 +52,20 @@ export class BrowserSyncManager {
       }
 
       // Vivaldi
-      const vivaldiUserData = join(appSupport, "Vivaldi", "Default");
-      const vivaldiPref = join(vivaldiUserData, "Preferences");
-      if (existsSync(vivaldiPref)) {
-        profiles.push({ browser: "vivaldi", displayName: "Vivaldi", profileName: "Default", sourcePath: vivaldiPref });
+      const vivaldiUserData = join(appSupport, "Vivaldi");
+      if (existsSync(vivaldiUserData)) {
+        for (const entry of readdirSync(vivaldiUserData, { withFileTypes: true })) {
+          if (!entry.isDirectory() || (entry.name !== "Default" && !entry.name.startsWith("Profile "))) continue;
+          const profileDir = join(vivaldiUserData, entry.name);
+          const vivaldiPref = join(profileDir, "Preferences");
+          const sessionsDir = join(profileDir, "Sessions");
+          const sessionFiles = existsSync(sessionsDir)
+            ? readdirSync(sessionsDir).filter((name) => name.startsWith("Session_")).map((name) => join(sessionsDir, name)).sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)
+            : [];
+          if (existsSync(vivaldiPref)) {
+            profiles.push({ browser: "vivaldi", displayName: "Vivaldi", profileName: entry.name, sourcePath: vivaldiPref, sessionPath: sessionFiles[0] });
+          }
+        }
       }
 
       // Zen Browser
@@ -108,8 +118,11 @@ export class BrowserSyncManager {
             snapshotTime: timestamp,
           });
         } else if (prof.browser === "vivaldi") {
+          const safeSessionFile = prof.sessionPath ? `${safeTmpFile}_session` : undefined;
+          if (prof.sessionPath && safeSessionFile) copyFileSync(prof.sessionPath, safeSessionFile);
           nodes = parseVivaldiPreferences({
             filePath: safeTmpFile,
+            sessionFilePath: safeSessionFile,
             osType: this.osType,
             profileName: prof.profileName,
             snapshotTime: timestamp,
