@@ -58,8 +58,8 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
       getTree: (params) => {
         return db.getTree(params?.browserName, params?.profileName);
       },
-      triggerSync: () => {
-        const result = syncManager.runSync();
+      triggerSync: async () => {
+        const result = await syncManager.runSync();
         return result;
       },
       getAppPreferences: () => {
@@ -126,8 +126,8 @@ const saveWindowSize = (event: unknown) => {
 win.on("resize", saveWindowSize);
 win.on("close", () => db.setWindowSize(win.getSize().width, win.getSize().height));
 
-function syncAndNotify() {
-  const result = syncManager.runSync();
+async function syncAndNotify() {
+  const result = await syncManager.runSync();
   // The renderer performs the same reload after a manual Sync Now. Send the
   // matching event for daemon syncs so new/closed windows appear without a restart.
   const mainView = BrowserView.getById(win.webviewId);
@@ -136,13 +136,13 @@ function syncAndNotify() {
 }
 
 // Start from a fresh local snapshot instead of waiting for the first interval.
-syncAndNotify();
+void syncAndNotify();
 
 // Background sync loop (1 minute)
 const SYNC_INTERVAL_MS = 1 * 60 * 1000;
 let autoSyncPaused = false;
 
-function runAutoSync(reason: "periodic" | "resumed") {
+async function runAutoSync(reason: "periodic" | "resumed") {
   if (autoSyncPaused) {
     console.log("[SyncTable Daemon] Auto-sync paused while the session is inactive.");
     return;
@@ -150,7 +150,7 @@ function runAutoSync(reason: "periodic" | "resumed") {
 
   try {
     console.log(`[SyncTable Daemon] Starting ${reason} background sync...`);
-    const result = syncAndNotify();
+    const result = await syncAndNotify();
     console.log(`[SyncTable Daemon] Auto-sync complete (${result.syncedNodesCount} nodes).`);
   } catch (err) {
     console.error("[SyncTable Daemon] Auto-sync error:", err);

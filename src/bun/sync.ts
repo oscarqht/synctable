@@ -4,14 +4,47 @@ import { homedir, platform } from "node:os";
 import type { BrowserTreeNode, OSType, SyncResult, SyncStats } from "../shared/types";
 import { parseArcSidebar, parseChromePreferences, parseDiaTree, parseFirefoxSessionstore, parseVivaldiPreferences, parseZenSessionstore } from "./parsers";
 import type { SyncTableDB } from "./db";
+import { defaultKeychain, KeychainService } from "./keychain";
+import { defaultRaindropClient, RaindropClient } from "./raindrop";
+
+export function canonicalizeTree(nodes: BrowserTreeNode[]): any {
+  return nodes.map((node) => ({
+    id: node.id,
+    browser_name: node.browser_name,
+    os_type: node.os_type,
+    profile_name: node.profile_name,
+    node_type: node.node_type,
+    title: node.title,
+    url: node.url,
+    parent_id: node.parent_id,
+    sort_order: node.sort_order,
+    children: node.children ? canonicalizeTree(node.children) : [],
+  }));
+}
+
+export function computeTreeHash(nodes: BrowserTreeNode[]): string {
+  const canonical = canonicalizeTree(nodes);
+  const jsonStr = JSON.stringify(canonical);
+  const hasher = new Bun.CryptoHasher("sha256");
+  hasher.update(jsonStr);
+  return hasher.digest("hex");
+}
 
 export class BrowserSyncManager {
   private db: SyncTableDB;
+  private keychain: KeychainService;
+  private raindropClient: RaindropClient;
   private osType: OSType;
   private cacheDir: string;
 
-  constructor(db: SyncTableDB) {
+  constructor(
+    db: SyncTableDB,
+    keychain: KeychainService = defaultKeychain,
+    raindropClient: RaindropClient = defaultRaindropClient
+  ) {
     this.db = db;
+    this.keychain = keychain;
+    this.raindropClient = raindropClient;
     this.osType = this.detectOSType();
     this.cacheDir = join(homedir(), ".browser_sync_cache", "tmp");
     mkdirSync(this.cacheDir, { recursive: true });
@@ -129,7 +162,7 @@ export class BrowserSyncManager {
     return profiles;
   }
 
-  public runSync(): SyncResult {
+  public async runSync(): Promise<SyncResult> {
     const timestamp = new Date().toISOString();
     const profiles = this.getBrowserProfiles();
     let syncedNodesCount = 0;
@@ -206,6 +239,24 @@ export class BrowserSyncManager {
       } catch (err: any) {
         errors.push({ browser: prof.browser, message: err?.message || String(err) });
       }
+    }
+
+    try {
+      const fullTree = this.db.getTree();
+      const currentTreeHash = computeTreeHash(fullTree);
+      const previousTreeHash = this.db.getLastUploadedTreeHash();
+
+      const raindropToken = this.keychain.getRaindropToken()?.trim();
+      if (raindropToken && currentTreeHash !== previousTreeHash) {
+        const deviceId = this.db.getOrCreateDeviceId();
+        const deviceName = this.db.getAppPreferences().deviceName;
+        await this.raindropClient.syncTree(raindropToken, deviceId, fullTree, deviceName);
+        this.db.setLastUploadedTreeHash(currentTreeHash);
+      }
+    } catch (err: any) {
+      const message = err?.message || String(err);
+      console.error("[SyncTable] Raindrop sync error:", message);
+      errors.push({ browser: "raindrop", message });
     }
 
     return {

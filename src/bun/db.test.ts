@@ -40,4 +40,28 @@ describe("SyncTableDB", () => {
 
     expect(db.getAppPreferences().deviceName).toBe("Tanya's MacBook Pro");
   });
+
+  test("creates and reuses a stable unique device identifier", () => {
+    const db = new SyncTableDB(":memory:");
+
+    const id1 = db.getOrCreateDeviceId();
+    expect(typeof id1).toBe("string");
+    expect(id1.length).toBeGreaterThan(0);
+
+    const id2 = db.getOrCreateDeviceId();
+    expect(id2).toBe(id1);
+  });
+
+  test("persists and retrieves the last uploaded tree hash", () => {
+    const db = new SyncTableDB(":memory:");
+
+    expect(db.getLastUploadedTreeHash()).toBeNull();
+
+    db.setLastUploadedTreeHash("abc123hash");
+    expect(db.getLastUploadedTreeHash()).toBe("abc123hash");
+
+    db.setLastUploadedTreeHash("def456hash");
+    expect(db.getLastUploadedTreeHash()).toBe("def456hash");
+  });
 });
+

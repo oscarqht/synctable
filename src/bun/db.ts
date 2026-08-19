@@ -84,6 +84,38 @@ export class SyncTableDB {
     ).run({ $deviceName: normalizedName });
   }
 
+  public getOrCreateDeviceId(): string {
+    const row = this.db
+      .query("SELECT value FROM app_preferences WHERE key = 'deviceId'")
+      .get() as { value: string } | null;
+
+    if (row?.value) {
+      return row.value;
+    }
+
+    const newId = crypto.randomUUID();
+    this.db.prepare(
+      `INSERT INTO app_preferences (key, value) VALUES ('deviceId', $deviceId)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    ).run({ $deviceId: newId });
+
+    return newId;
+  }
+
+  public getLastUploadedTreeHash(): string | null {
+    const row = this.db
+      .query("SELECT value FROM app_preferences WHERE key = 'lastUploadedTreeHash'")
+      .get() as { value: string } | null;
+    return row?.value ?? null;
+  }
+
+  public setLastUploadedTreeHash(hash: string): void {
+    this.db.prepare(
+      `INSERT INTO app_preferences (key, value) VALUES ('lastUploadedTreeHash', $hash)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    ).run({ $hash: hash });
+  }
+
   public getWindowSize(): { width: number; height: number } | null {
     const width = this.db
       .query("SELECT value FROM app_preferences WHERE key = 'windowWidth'")
