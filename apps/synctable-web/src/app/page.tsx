@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   FolderTree,
   LogIn,
@@ -11,23 +11,75 @@ import {
   Layers,
   AlertCircle,
   Loader2,
+  RefreshCw,
+  Search,
+  Laptop,
+  Monitor,
+  Maximize2,
+  Minimize2,
+  Filter,
   CheckCircle2,
+  ExternalLink,
+  ChevronRight,
+  HardDrive,
+  Clock,
+  X,
 } from "lucide-react";
 import type { RaindropUserProfile } from "@/lib/raindrop";
+import type {
+  DeviceTreeData,
+  SynctableSyncResponse,
+  BrowserTreeNode,
+} from "@/lib/types";
+import { TreeNodeItem } from "./components/TreeNodeItem";
+
+function formatRelativeTime(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (isNaN(diffMs)) return "Unknown";
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 45) return "Just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}h ago`;
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay === 1) return "Yesterday";
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return dateString;
+  }
+}
 
 export default function Home() {
   const [user, setUser] = useState<RaindropUserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // Sync data state
+  const [syncData, setSyncData] = useState<SynctableSyncResponse | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedBrowser, setSelectedBrowser] = useState<string>("all");
+  const [nodeTypeFilter, setNodeTypeFilter] = useState<string>("all");
+  const [treeExpandedState, setTreeExpandedState] = useState<boolean>(true);
+
+  // Load User Auth
   useEffect(() => {
-    // Check if error parameter is present in URL
     const urlParams = new URLSearchParams(window.location.search);
     const error = urlParams.get("error");
     if (error) {
       setErrorMessage(error);
-      // Clean query parameter from URL without reload
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -41,18 +93,52 @@ export default function Home() {
       } catch (err) {
         console.error("Failed to check auth status:", err);
       } finally {
-        setLoading(false);
+        setAuthLoading(false);
       }
     }
 
     checkAuth();
   }, []);
 
+  // Fetch Synctable Root Collection & Device Files
+  const fetchSyncData = async () => {
+    if (!user) return;
+    setSyncLoading(true);
+    try {
+      const res = await fetch("/api/sync/tree");
+      if (res.ok) {
+        const data = (await res.json()) as SynctableSyncResponse;
+        setSyncData(data);
+        // Default select first device if available and not 'all'
+        if (data.devices.length > 0 && selectedDeviceId === "all") {
+          setSelectedDeviceId("all");
+        }
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        setErrorMessage(
+          errorData.error || "Failed to load Synctable data from Raindrop"
+        );
+      }
+    } catch (err: any) {
+      console.error("Error fetching Synctable data:", err);
+      setErrorMessage(err.message || "Failed to load Synctable data");
+    } finally {
+      setSyncLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      fetchSyncData();
+    }
+  }, [user]);
+
   const handleLogout = async () => {
     setLoggingOut(true);
     try {
       await fetch("/api/auth/logout", { method: "POST" });
       setUser(null);
+      setSyncData(null);
     } catch (err) {
       console.error("Failed to logout:", err);
     } finally {
@@ -60,10 +146,46 @@ export default function Home() {
     }
   };
 
+  // Collect all unique browsers across devices
+  const availableBrowsers = useMemo(() => {
+    if (!syncData?.devices) return [];
+    const set = new Set<string>();
+    for (const dev of syncData.devices) {
+      for (const b of dev.stats.browsers) {
+        set.add(b.toLowerCase());
+      }
+    }
+    return Array.from(set).sort();
+  }, [syncData]);
+
+  // Aggregate stats
+  const totalStats = useMemo(() => {
+    if (!syncData?.devices)
+      return { totalTabs: 0, totalWorkspaces: 0, totalDevices: 0 };
+    let tabs = 0;
+    let workspaces = 0;
+    for (const d of syncData.devices) {
+      tabs += d.stats.totalTabs;
+      workspaces += d.stats.totalWorkspaces;
+    }
+    return {
+      totalTabs: tabs,
+      totalWorkspaces: workspaces,
+      totalDevices: syncData.devices.length,
+    };
+  }, [syncData]);
+
+  // Active devices to render
+  const visibleDevices = useMemo(() => {
+    if (!syncData?.devices) return [];
+    if (selectedDeviceId === "all") return syncData.devices;
+    return syncData.devices.filter((d) => d.deviceId === selectedDeviceId);
+  }, [syncData, selectedDeviceId]);
+
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-100/80 text-slate-800 flex flex-col selection:bg-cyan-500/20 selection:text-cyan-900">
+    <main className="min-h-screen bg-slate-50 text-slate-800 flex flex-col selection:bg-cyan-500/20 selection:text-cyan-900">
       {/* Navigation Header */}
-      <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur-xl sticky top-0 z-50 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
+      <header className="border-b border-slate-200/80 bg-white/85 backdrop-blur-xl sticky top-0 z-50 shadow-[0_1px_3px_rgba(0,0,0,0.03)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center space-x-3">
@@ -84,8 +206,8 @@ export default function Home() {
           </div>
 
           {/* Header Right Actions / Profile */}
-          <div className="flex items-center space-x-4">
-            {loading ? (
+          <div className="flex items-center space-x-3">
+            {authLoading ? (
               <div className="flex items-center space-x-2 text-xs text-slate-500">
                 <Loader2 className="w-4 h-4 animate-spin text-cyan-600" />
                 <span>Checking session...</span>
@@ -93,12 +215,27 @@ export default function Home() {
             ) : user ? (
               /* User Profile in Header */
               <div className="flex items-center space-x-3">
-                <div className="flex items-center space-x-3 bg-slate-100/90 border border-slate-200/90 rounded-full pl-2 pr-3.5 py-1.5 backdrop-blur shadow-sm">
+                {/* Refresh Sync Data Button */}
+                <button
+                  onClick={fetchSyncData}
+                  disabled={syncLoading}
+                  title="Refresh Raindrop Synctable Data"
+                  className="flex items-center space-x-1.5 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg transition-all shadow-xs hover:border-slate-300 active:scale-95"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 text-cyan-600 ${
+                      syncLoading ? "animate-spin" : ""
+                    }`}
+                  />
+                  <span className="hidden sm:inline">Refresh</span>
+                </button>
+
+                <div className="flex items-center space-x-2.5 bg-slate-100/90 border border-slate-200/90 rounded-full pl-2 pr-3.5 py-1.5 backdrop-blur shadow-xs">
                   {user.avatarUrl ? (
                     <img
                       src={user.avatarUrl}
                       alt={user.name}
-                      className="w-7 h-7 rounded-full object-cover border border-slate-200 shadow-sm"
+                      className="w-7 h-7 rounded-full object-cover border border-slate-200 shadow-xs"
                     />
                   ) : (
                     <div className="w-7 h-7 rounded-full bg-indigo-100 border border-indigo-200 text-indigo-700 font-bold text-xs flex items-center justify-center">
@@ -108,17 +245,17 @@ export default function Home() {
 
                   <div className="flex flex-col text-left leading-tight">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-slate-800 max-w-[120px] sm:max-w-[160px] truncate">
+                      <span className="text-xs font-semibold text-slate-800 max-w-[110px] sm:max-w-[150px] truncate">
                         {user.name}
                       </span>
                       {user.isPro && (
-                        <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                        <span className="text-[9px] uppercase font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200">
                           PRO
                         </span>
                       )}
                     </div>
                     {user.email && (
-                      <span className="text-[10px] text-slate-500 max-w-[120px] sm:max-w-[160px] truncate">
+                      <span className="text-[10px] text-slate-500 max-w-[110px] sm:max-w-[150px] truncate">
                         {user.email}
                       </span>
                     )}
@@ -130,7 +267,7 @@ export default function Home() {
                   onClick={handleLogout}
                   disabled={loggingOut}
                   title="Sign out of Raindrop"
-                  className="flex items-center space-x-1.5 text-xs font-medium bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                  className="flex items-center space-x-1.5 text-xs font-medium bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 px-3 py-1.5 rounded-lg transition-all shadow-xs"
                 >
                   {loggingOut ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -155,14 +292,13 @@ export default function Home() {
       </header>
 
       {/* Main Content Area */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full flex flex-col">
-        {/* Error notification banner if any */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full flex flex-col">
+        {/* Error notification banner */}
         {errorMessage && (
-          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-start gap-3 text-sm animate-fadeIn shadow-sm">
+          <div className="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-start gap-3 text-sm animate-fadeIn shadow-xs">
             <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <span className="font-semibold">Authentication Error:</span>{" "}
-              {errorMessage}
+              <span className="font-semibold">Notice:</span> {errorMessage}
             </div>
             <button
               onClick={() => setErrorMessage(null)}
@@ -173,19 +309,18 @@ export default function Home() {
           </div>
         )}
 
-        {loading ? (
-          /* Loading State */
+        {authLoading ? (
+          /* Loading Auth State */
           <div className="flex-1 flex flex-col items-center justify-center py-24 text-slate-500 space-y-3">
             <Loader2 className="w-8 h-8 animate-spin text-cyan-600" />
             <p className="text-sm">Loading SyncTable...</p>
           </div>
         ) : !user ? (
-          /* BEFORE LOGIN: Placeholder & Login Section */
+          /* BEFORE LOGIN: Landing & Raindrop Connect Card */
           <div className="flex-1 flex flex-col items-center justify-center py-12 px-4">
             <div className="w-full max-w-xl text-center space-y-8">
-              {/* Badge & Icon */}
               <div className="flex flex-col items-center space-y-4">
-                <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 text-xs font-medium shadow-sm">
+                <div className="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-cyan-50 border border-cyan-200 text-cyan-700 text-xs font-medium shadow-xs">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Raindrop.io Cloud Sync Integration</span>
                 </div>
@@ -200,7 +335,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Headings */}
               <div className="space-y-3">
                 <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 bg-clip-text text-transparent">
                   Connect Your Raindrop Account
@@ -211,7 +345,6 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Login Button Card */}
               <div className="p-6 sm:p-8 rounded-2xl bg-white border border-slate-200/90 shadow-xl shadow-slate-200/60 space-y-4">
                 <a
                   href="/api/auth/login"
@@ -226,9 +359,8 @@ export default function Home() {
                 </p>
               </div>
 
-              {/* Features List */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left pt-2">
-                <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-sm flex flex-col space-y-1.5">
+                <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-xs flex flex-col space-y-1.5">
                   <div className="flex items-center space-x-2 text-cyan-600">
                     <Globe className="w-4 h-4" />
                     <span className="text-xs font-semibold text-slate-800">
@@ -236,11 +368,11 @@ export default function Home() {
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Sync tabs across Arc, Zen, Chrome, and more.
+                    Sync tabs across Arc, Zen, Chrome, Firefox, Dia and more.
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-sm flex flex-col space-y-1.5">
+                <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-xs flex flex-col space-y-1.5">
                   <div className="flex items-center space-x-2 text-indigo-600">
                     <Layers className="w-4 h-4" />
                     <span className="text-xs font-semibold text-slate-800">
@@ -248,15 +380,15 @@ export default function Home() {
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Full hierarchy retention and tab organization.
+                    Full hierarchy retention and workspace organisation.
                   </p>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-sm flex flex-col space-y-1.5">
+                <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-xs flex flex-col space-y-1.5">
                   <div className="flex items-center space-x-2 text-emerald-600">
                     <ShieldCheck className="w-4 h-4" />
                     <span className="text-xs font-semibold text-slate-800">
-                      Raindrop Powered
+                      Raindrop Cloud
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
@@ -267,17 +399,417 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          /* AFTER LOGIN: Empty Content Area */
-          <div className="flex-1 flex flex-col">
-            {/* Content left empty for now as requested */}
+          /* AFTER LOGIN: Multi-Device Browser Tree Viewer */
+          <div className="flex-1 flex flex-col space-y-6">
+            {/* Top Overview & Metrics Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold tracking-tight text-slate-900">
+                    Device Workspaces & Trees
+                  </h1>
+                  {syncData?.collection && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Collection &quot;Synctable&quot; Active</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500">
+                  Inspecting snapshot trees fetched from your Raindrop Synctable
+                  collection.
+                </p>
+              </div>
+
+              {/* Aggregated Counters */}
+              <div className="flex items-center gap-3">
+                <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-center min-w-[76px]">
+                  <div className="text-lg font-extrabold text-slate-900 leading-none">
+                    {totalStats.totalDevices}
+                  </div>
+                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mt-1">
+                    Devices
+                  </div>
+                </div>
+
+                <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-center min-w-[76px]">
+                  <div className="text-lg font-extrabold text-cyan-700 leading-none">
+                    {totalStats.totalTabs}
+                  </div>
+                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mt-1">
+                    Tabs
+                  </div>
+                </div>
+
+                <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-center min-w-[76px]">
+                  <div className="text-lg font-extrabold text-indigo-700 leading-none">
+                    {totalStats.totalWorkspaces}
+                  </div>
+                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mt-1">
+                    Spaces
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Syncing / Loading Overlay */}
+            {syncLoading && !syncData ? (
+              <div className="py-20 flex flex-col items-center justify-center space-y-4 bg-white rounded-2xl border border-slate-200/80">
+                <Loader2 className="w-8 h-8 animate-spin text-cyan-600" />
+                <div className="text-center space-y-1">
+                  <p className="text-sm font-semibold text-slate-800">
+                    Locating Synctable collection & downloading tree snapshots...
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Querying Raindrop.io REST API and parsing JSON files
+                  </p>
+                </div>
+              </div>
+            ) : !syncData?.collection ? (
+              /* No Synctable Collection Found State */
+              <div className="py-16 px-6 bg-white rounded-2xl border border-slate-200/80 text-center max-w-2xl mx-auto space-y-6 shadow-xs">
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mx-auto">
+                  <AlertCircle className="w-7 h-7" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-lg font-bold text-slate-900">
+                    No &quot;Synctable&quot; Collection Found in Raindrop
+                  </h3>
+                  <p className="text-sm text-slate-600 max-w-lg mx-auto">
+                    We could not find a collection named <strong>Synctable</strong> in
+                    your Raindrop account. Follow these quick steps to upload
+                    your first snapshot:
+                  </p>
+                </div>
+
+                {/* Instruction Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                      STEP 1
+                    </span>
+                    <h4 className="text-xs font-semibold text-slate-800 pt-1">
+                      Open Desktop App
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Launch SyncTable on macOS/Windows/Linux.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                      STEP 2
+                    </span>
+                    <h4 className="text-xs font-semibold text-slate-800 pt-1">
+                      Set Raindrop Token
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Go to Settings in Desktop app & paste your token.
+                    </p>
+                  </div>
+
+                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
+                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                      STEP 3
+                    </span>
+                    <h4 className="text-xs font-semibold text-slate-800 pt-1">
+                      Click Sync Now
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Click Sync Now and then refresh this page.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={fetchSyncData}
+                  disabled={syncLoading}
+                  className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium shadow-sm transition-all active:scale-95"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${syncLoading ? "animate-spin" : ""}`}
+                  />
+                  <span>Check Raindrop Again</span>
+                </button>
+              </div>
+            ) : syncData.devices.length === 0 ? (
+              /* Synctable Collection Found But 0 Items */
+              <div className="py-16 px-6 bg-white rounded-2xl border border-slate-200/80 text-center max-w-lg mx-auto space-y-5 shadow-xs">
+                <div className="w-14 h-14 rounded-2xl bg-cyan-50 border border-cyan-200 flex items-center justify-center text-cyan-600 mx-auto">
+                  <HardDrive className="w-7 h-7" />
+                </div>
+                <div className="space-y-1.5">
+                  <h3 className="text-base font-bold text-slate-900">
+                    Collection &quot;Synctable&quot; is Empty
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    The root collection was found, but no device snapshots have
+                    been uploaded yet. Trigger a sync from your SyncTable desktop
+                    daemon.
+                  </p>
+                </div>
+                <button
+                  onClick={fetchSyncData}
+                  disabled={syncLoading}
+                  className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium shadow-sm transition-all"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${syncLoading ? "animate-spin" : ""}`}
+                  />
+                  <span>Refresh</span>
+                </button>
+              </div>
+            ) : (
+              /* Devices and Browser Trees Available */
+              <div className="space-y-5">
+                {/* Device Selector Tabs */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-600 uppercase tracking-wider">
+                      Connected Devices ({syncData.devices.length})
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {/* All Devices Button */}
+                    <button
+                      onClick={() => setSelectedDeviceId("all")}
+                      className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between space-y-2.5 ${
+                        selectedDeviceId === "all"
+                          ? "bg-cyan-50/80 border-cyan-300 ring-2 ring-cyan-500/20 shadow-xs"
+                          : "bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/50"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white shadow-xs">
+                            <Monitor className="w-4 h-4" />
+                          </div>
+                          <span className="font-semibold text-xs text-slate-900">
+                            All Devices
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                          {syncData.devices.length}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/50 w-full">
+                        <span>Combined Tree</span>
+                        <span className="font-medium text-slate-700">
+                          {totalStats.totalTabs} tabs
+                        </span>
+                      </div>
+                    </button>
+
+                    {/* Individual Device Cards */}
+                    {syncData.devices.map((device) => {
+                      const isSelected = selectedDeviceId === device.deviceId;
+                      return (
+                        <button
+                          key={device.deviceId}
+                          onClick={() => setSelectedDeviceId(device.deviceId)}
+                          className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between space-y-2.5 ${
+                            isSelected
+                              ? "bg-cyan-50/80 border-cyan-300 ring-2 ring-cyan-500/20 shadow-xs"
+                              : "bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/50"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between w-full">
+                            <div className="flex items-center space-x-2.5 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 shrink-0">
+                                <Laptop className="w-4 h-4" />
+                              </div>
+                              <div className="min-w-0">
+                                <h3 className="font-semibold text-xs text-slate-900 truncate" title={device.deviceName}>
+                                  {device.deviceName}
+                                </h3>
+                                <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                                  <Clock className="w-2.5 h-2.5 text-slate-400" />
+                                  <span>{formatRelativeTime(device.lastUpdated)}</span>
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-200/50 w-full">
+                            <span className="text-[10px] uppercase font-bold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded">
+                              {device.stats.browsers.join(", ") || "Browser"}
+                            </span>
+                            <span className="font-semibold text-slate-700">
+                              {device.stats.totalTabs} tabs
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Filter & Search Toolbar */}
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    {/* Search Input */}
+                    <div className="relative flex-1 max-w-md">
+                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search tabs, URLs, or profiles..."
+                        className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all text-slate-800 placeholder:text-slate-400"
+                      />
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Expand/Collapse and Filter Actions */}
+                    <div className="flex items-center flex-wrap gap-2">
+                      {/* Node Type Selector */}
+                      <select
+                        value={nodeTypeFilter}
+                        onChange={(e) => setNodeTypeFilter(e.target.value)}
+                        className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 cursor-pointer"
+                      >
+                        <option value="all">All Node Types</option>
+                        <option value="tabs">Tabs Only</option>
+                      </select>
+
+                      {/* Expand / Collapse All Toggle */}
+                      <button
+                        onClick={() => setTreeExpandedState(!treeExpandedState)}
+                        className="flex items-center space-x-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-xl transition-all shadow-2xs"
+                      >
+                        {treeExpandedState ? (
+                          <>
+                            <Minimize2 className="w-3.5 h-3.5" />
+                            <span>Collapse</span>
+                          </>
+                        ) : (
+                          <>
+                            <Maximize2 className="w-3.5 h-3.5" />
+                            <span>Expand</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Browser Filter Chips */}
+                  {availableBrowsers.length > 0 && (
+                    <div className="flex items-center flex-wrap gap-1.5 pt-1 border-t border-slate-100">
+                      <span className="text-[11px] font-medium text-slate-400 mr-1 flex items-center gap-1">
+                        <Filter className="w-3 h-3" /> Browsers:
+                      </span>
+
+                      <button
+                        onClick={() => setSelectedBrowser("all")}
+                        className={`text-[11px] font-medium px-2.5 py-1 rounded-lg border transition-all ${
+                          selectedBrowser === "all"
+                            ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                            : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        All Browsers
+                      </button>
+
+                      {availableBrowsers.map((b) => (
+                        <button
+                          key={b}
+                          onClick={() => setSelectedBrowser(b)}
+                          className={`text-[11px] font-medium px-2.5 py-1 rounded-lg border uppercase tracking-wider transition-all ${
+                            selectedBrowser === b
+                              ? "bg-cyan-600 text-white border-cyan-600 shadow-2xs"
+                              : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                          }`}
+                        >
+                          {b}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Device Trees View Container */}
+                <div className="space-y-6">
+                  {visibleDevices.map((device) => {
+                    return (
+                      <div
+                        key={device.deviceId}
+                        className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden"
+                      >
+                        {/* Device Tree Header Banner */}
+                        <div className="bg-slate-50/90 px-4 py-3 border-b border-slate-200/80 flex items-center justify-between flex-wrap gap-2">
+                          <div className="flex items-center space-x-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
+                              <Laptop className="w-4 h-4" />
+                            </div>
+                            <div>
+                              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                {device.deviceName}
+                                <span className="text-[10px] font-medium text-slate-500 bg-slate-200/60 px-1.5 py-0.2 rounded font-mono">
+                                  {device.fileName}
+                                </span>
+                              </h2>
+                              <p className="text-[10px] text-slate-500">
+                                Last synced {formatRelativeTime(device.lastUpdated)} &middot;{" "}
+                                {device.stats.totalTabs} tabs &middot;{" "}
+                                {device.stats.totalWorkspaces} workspaces
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            {device.stats.browsers.map((b) => (
+                              <span
+                                key={b}
+                                className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 shadow-2xs"
+                              >
+                                {b}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Tree Nodes List */}
+                        <div className="p-4 space-y-1 max-h-[680px] overflow-y-auto">
+                          {device.tree.length === 0 ? (
+                            <div className="py-8 text-center text-xs text-slate-400">
+                              No tree snapshots found inside {device.fileName}.
+                            </div>
+                          ) : (
+                            device.tree.map((node) => (
+                              <TreeNodeItem
+                                key={node.id || `${node.browser_name}_${node.profile_name}_${node.sort_order}`}
+                                node={node}
+                                searchQuery={searchQuery}
+                                browserFilter={selectedBrowser}
+                                nodeTypeFilter={nodeTypeFilter}
+                                defaultExpanded={treeExpandedState}
+                              />
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200/80 py-4 mt-auto text-center text-xs text-slate-500">
+      <footer className="border-t border-slate-200/80 py-4 mt-auto text-center text-xs text-slate-500 bg-white">
         SyncTable Monorepo &middot; Desktop Daemon & Next.js Web App
       </footer>
     </main>
   );
 }
+

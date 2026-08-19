@@ -141,3 +141,192 @@ export async function fetchRaindropUser(
     isPro: Boolean(user.pro),
   };
 }
+
+export const RAINDROP_COLLECTION_NAME = "Synctable";
+
+export interface RaindropCollectionItem {
+  _id: number;
+  title: string;
+  count?: number;
+  parent?: { $id: number };
+}
+
+export interface RaindropItem {
+  _id: number;
+  title: string;
+  excerpt?: string;
+  link?: string;
+  lastUpdate?: string;
+  created?: string;
+  file?: {
+    name?: string;
+    type?: string;
+    size?: number;
+  };
+}
+
+/**
+ * Find the root collection named "Synctable" from user's collections.
+ */
+export async function findSynctableCollection(
+  token: string
+): Promise<RaindropCollectionItem | null> {
+  // Fetch root collections
+  const res = await fetch(`${RAINDROP_API_BASE}/collections`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text().catch(() => "");
+    throw new Error(
+      `Failed to list Raindrop collections (${res.status}): ${errorText}`
+    );
+  }
+
+  const data = (await res.json()) as {
+    result?: boolean;
+    items?: RaindropCollectionItem[];
+  };
+
+  const collections = data.items || [];
+  let synctable = collections.find(
+    (c) =>
+      c.title?.trim().toLowerCase() === RAINDROP_COLLECTION_NAME.toLowerCase()
+  );
+
+  if (synctable) {
+    return synctable;
+  }
+
+  // Also check child collections if not in root
+  try {
+    const childRes = await fetch(`${RAINDROP_API_BASE}/collections/childrens`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+      cache: "no-store",
+    });
+    if (childRes.ok) {
+      const childData = (await childRes.json()) as {
+        result?: boolean;
+        items?: RaindropCollectionItem[];
+      };
+      synctable = childData.items?.find(
+        (c) =>
+          c.title?.trim().toLowerCase() ===
+          RAINDROP_COLLECTION_NAME.toLowerCase()
+      );
+      if (synctable) {
+        return synctable;
+      }
+    }
+  } catch (err) {
+    // Non-critical, ignore
+  }
+
+  return null;
+}
+
+/**
+ * Fetch all Raindrop items under the specified collection ID.
+ */
+export async function fetchCollectionRaindrops(
+  token: string,
+  collectionId: number
+): Promise<RaindropItem[]> {
+  const allItems: RaindropItem[] = [];
+  let page = 0;
+  const perpage = 50;
+
+  while (true) {
+    const res = await fetch(
+      `${RAINDROP_API_BASE}/raindrops/${collectionId}?perpage=${perpage}&page=${page}&sort=-lastUpdate`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+        cache: "no-store",
+      }
+    );
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "");
+      throw new Error(
+        `Failed to fetch raindrops in collection ${collectionId} (${res.status}): ${errorText}`
+      );
+    }
+
+    const data = (await res.json()) as {
+      result?: boolean;
+      items?: RaindropItem[];
+      count?: number;
+    };
+
+    const items = data.items || [];
+    allItems.push(...items);
+
+    if (items.length < perpage) {
+      break;
+    }
+    page++;
+    if (page > 10) break; // Safety limit
+  }
+
+  return allItems;
+}
+
+/**
+ * Fetch file content of a Raindrop item.
+ * Uses official Raindrop REST API endpoint: GET /rest/v1/raindrop/{id}/file
+ */
+export async function fetchRaindropFileContent(
+  token: string,
+  item: RaindropItem
+): Promise<any | null> {
+  const primaryApiUrl = `${RAINDROP_API_BASE}/raindrop/${item._id}/file`;
+  const candidates = [primaryApiUrl, item.link].filter(Boolean) as string[];
+
+  for (const candidateUrl of candidates) {
+    try {
+      const res = await fetch(candidateUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "User-Agent": "SyncTable-Web/1.0",
+        },
+        redirect: "follow",
+        cache: "no-store",
+      });
+
+      if (res.ok) {
+        const text = await res.text();
+        if (text && text.trim()) {
+          try {
+            return JSON.parse(text);
+          } catch {
+            // Not valid JSON, continue to next candidate
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[Raindrop] Error fetching from ${candidateUrl}:`, err);
+    }
+  }
+
+  console.warn(
+    `[Raindrop] Could not retrieve valid JSON file content for item ${item._id}`
+  );
+  return null;
+}
+
+
+
