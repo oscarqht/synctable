@@ -32,6 +32,8 @@ import type {
   BrowserTreeNode,
 } from "@/lib/types";
 import { TreeNodeItem } from "./components/TreeNodeItem";
+import { ZenSidebarView } from "./components/zen/ZenSidebarView";
+import { Sidebar, ListTree } from "lucide-react";
 
 function formatRelativeTime(dateString: string): string {
   try {
@@ -73,6 +75,7 @@ export default function Home() {
   const [selectedBrowser, setSelectedBrowser] = useState<string>("all");
   const [nodeTypeFilter, setNodeTypeFilter] = useState<string>("all");
   const [treeExpandedState, setTreeExpandedState] = useState<boolean>(true);
+  const [viewMode, setViewMode] = useState<"zen_sidebar" | "tree">("zen_sidebar");
 
   // Load User Auth
   useEffect(() => {
@@ -668,8 +671,34 @@ export default function Home() {
                       )}
                     </div>
 
-                    {/* Expand/Collapse and Filter Actions */}
+                    {/* Expand/Collapse, View Mode and Filter Actions */}
                     <div className="flex items-center flex-wrap gap-2">
+                      {/* View Mode Switcher */}
+                      <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
+                        <button
+                          onClick={() => setViewMode("zen_sidebar")}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                            viewMode === "zen_sidebar"
+                              ? "bg-white dark:bg-slate-900 text-cyan-600 dark:text-cyan-400 shadow-xs"
+                              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                          }`}
+                        >
+                          <Sidebar className="w-3.5 h-3.5" />
+                          <span>Zen Sidebar</span>
+                        </button>
+                        <button
+                          onClick={() => setViewMode("tree")}
+                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
+                            viewMode === "tree"
+                              ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
+                              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                          }`}
+                        >
+                          <ListTree className="w-3.5 h-3.5" />
+                          <span>Zen Tree</span>
+                        </button>
+                      </div>
+
                       {/* Node Type Selector */}
                       <select
                         value={nodeTypeFilter}
@@ -680,23 +709,25 @@ export default function Home() {
                         <option value="tabs">Tabs Only</option>
                       </select>
 
-                      {/* Expand / Collapse All Toggle */}
-                      <button
-                        onClick={() => setTreeExpandedState(!treeExpandedState)}
-                        className="flex items-center space-x-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-xl transition-all shadow-2xs"
-                      >
-                        {treeExpandedState ? (
-                          <>
-                            <Minimize2 className="w-3.5 h-3.5" />
-                            <span>Collapse</span>
-                          </>
-                        ) : (
-                          <>
-                            <Maximize2 className="w-3.5 h-3.5" />
-                            <span>Expand</span>
-                          </>
-                        )}
-                      </button>
+                      {/* Expand / Collapse All Toggle (Tree view) */}
+                      {viewMode === "tree" && (
+                        <button
+                          onClick={() => setTreeExpandedState(!treeExpandedState)}
+                          className="flex items-center space-x-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-xl transition-all shadow-2xs"
+                        >
+                          {treeExpandedState ? (
+                            <>
+                              <Minimize2 className="w-3.5 h-3.5" />
+                              <span>Collapse</span>
+                            </>
+                          ) : (
+                            <>
+                              <Maximize2 className="w-3.5 h-3.5" />
+                              <span>Expand</span>
+                            </>
+                          )}
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -735,9 +766,16 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* Device Trees View Container */}
+                {/* Device Trees / Zen Sidebars View Container */}
                 <div className="space-y-6">
                   {visibleDevices.map((device) => {
+                    const filteredRoots = device.tree.filter((node) => {
+                      if (selectedBrowser !== "all" && node.browser_name) {
+                        return node.browser_name.toLowerCase() === selectedBrowser.toLowerCase();
+                      }
+                      return true;
+                    });
+
                     return (
                       <div
                         key={device.deviceId}
@@ -776,23 +814,37 @@ export default function Home() {
                           </div>
                         </div>
 
-                        {/* Tree Nodes List */}
-                        <div className="p-4 space-y-1 max-h-[680px] overflow-y-auto">
-                          {device.tree.length === 0 ? (
+                        {/* Content Area: Zen Sidebar View or Zen Tree View */}
+                        <div className="p-4 space-y-4">
+                          {filteredRoots.length === 0 ? (
                             <div className="py-8 text-center text-xs text-slate-400">
-                              No tree snapshots found inside {device.fileName}.
+                              No tree snapshots match the current filters inside {device.fileName}.
+                            </div>
+                          ) : viewMode === "zen_sidebar" ? (
+                            /* Zen Browser Sidebar Mode */
+                            <div className="space-y-4">
+                              {filteredRoots.map((rootNode) => (
+                                <ZenSidebarView
+                                  key={rootNode.id || `${rootNode.browser_name}_${rootNode.profile_name}`}
+                                  rootNode={rootNode}
+                                  searchQuery={searchQuery}
+                                />
+                              ))}
                             </div>
                           ) : (
-                            device.tree.map((node) => (
-                              <TreeNodeItem
-                                key={node.id || `${node.browser_name}_${node.profile_name}_${node.sort_order}`}
-                                node={node}
-                                searchQuery={searchQuery}
-                                browserFilter={selectedBrowser}
-                                nodeTypeFilter={nodeTypeFilter}
-                                defaultExpanded={treeExpandedState}
-                              />
-                            ))
+                            /* Zen Tree Hierarchy Mode */
+                            <div className="space-y-1 max-h-[680px] overflow-y-auto zen-scrollbar">
+                              {filteredRoots.map((node) => (
+                                <TreeNodeItem
+                                  key={node.id || `${node.browser_name}_${node.profile_name}_${node.sort_order}`}
+                                  node={node}
+                                  searchQuery={searchQuery}
+                                  browserFilter={selectedBrowser}
+                                  nodeTypeFilter={nodeTypeFilter}
+                                  defaultExpanded={treeExpandedState}
+                                />
+                              ))}
+                            </div>
                           )}
                         </div>
                       </div>

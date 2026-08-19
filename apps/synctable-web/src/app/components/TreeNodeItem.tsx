@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import {
   Folder,
-  FolderOpen,
   Globe,
   Layers,
   Layout,
@@ -17,6 +16,9 @@ import {
   Compass,
 } from "lucide-react";
 import type { BrowserTreeNode, NodeType } from "@/lib/types";
+import { ZenFolderIcon } from "./zen/ZenFolderIcon";
+import { ZenSplitViewItem } from "./zen/ZenSplitViewItem";
+import { getDomain, getFaviconUrl } from "./zen/ZenTabItem";
 
 interface TreeNodeItemProps {
   node: BrowserTreeNode;
@@ -32,44 +34,44 @@ function getNodeBadge(nodeType: NodeType) {
     case "workspace":
       return {
         label: "Space",
-        className: "bg-purple-50 text-purple-700 border-purple-200",
+        className: "bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/60 dark:text-purple-300 dark:border-purple-800",
         icon: Layers,
       };
     case "folder":
       return {
         label: "Folder",
-        className: "bg-amber-50 text-amber-700 border-amber-200",
+        className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800",
         icon: Folder,
       };
     case "window":
       return {
         label: "Window",
-        className: "bg-slate-100 text-slate-700 border-slate-200",
+        className: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
         icon: Layout,
       };
     case "split_view":
       return {
         label: "Split",
-        className: "bg-cyan-50 text-cyan-700 border-cyan-200",
+        className: "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800",
         icon: Columns,
       };
     case "pinned_tab":
       return {
         label: "Pinned",
-        className: "bg-rose-50 text-rose-700 border-rose-200",
+        className: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800",
         icon: Pin,
       };
     case "tab":
       return {
         label: "Tab",
-        className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+        className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800",
         icon: Globe,
       };
     case "root":
     default:
       return {
         label: "Browser",
-        className: "bg-indigo-50 text-indigo-700 border-indigo-200",
+        className: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800",
         icon: Compass,
       };
   }
@@ -78,59 +80,50 @@ function getNodeBadge(nodeType: NodeType) {
 function getBrowserBadge(browserName: string) {
   const normalized = (browserName || "").toLowerCase();
   switch (normalized) {
-    case "arc":
-      return {
-        label: "Arc",
-        color: "from-pink-500 to-rose-500 text-white",
-        bg: "bg-rose-50 text-rose-700 border-rose-200",
-      };
     case "zen":
       return {
         label: "Zen",
-        color: "from-cyan-500 to-blue-500 text-white",
-        bg: "bg-cyan-50 text-cyan-700 border-cyan-200",
+        bg: "bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800",
+      };
+    case "arc":
+      return {
+        label: "Arc",
+        bg: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800",
       };
     case "chrome":
       return {
         label: "Chrome",
-        color: "from-amber-500 via-emerald-500 to-blue-500 text-white",
-        bg: "bg-amber-50 text-amber-800 border-amber-200",
+        bg: "bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800",
       };
     case "firefox":
       return {
         label: "Firefox",
-        color: "from-orange-500 to-amber-500 text-white",
-        bg: "bg-orange-50 text-orange-700 border-orange-200",
+        bg: "bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/60 dark:text-orange-300 dark:border-orange-800",
       };
     case "vivaldi":
       return {
         label: "Vivaldi",
-        color: "from-red-500 to-rose-600 text-white",
-        bg: "bg-red-50 text-red-700 border-red-200",
+        bg: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/60 dark:text-red-300 dark:border-red-800",
       };
     case "dia":
       return {
         label: "Dia",
-        color: "from-indigo-500 to-violet-600 text-white",
-        bg: "bg-indigo-50 text-indigo-700 border-indigo-200",
+        bg: "bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800",
       };
     case "safari":
       return {
         label: "Safari",
-        color: "from-blue-500 to-cyan-600 text-white",
-        bg: "bg-blue-50 text-blue-700 border-blue-200",
+        bg: "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800",
       };
     case "edge":
       return {
         label: "Edge",
-        color: "from-teal-500 to-cyan-600 text-white",
-        bg: "bg-teal-50 text-teal-700 border-teal-200",
+        bg: "bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/60 dark:text-teal-300 dark:border-teal-800",
       };
     default:
       return {
         label: browserName || "Browser",
-        color: "from-slate-600 to-slate-800 text-white",
-        bg: "bg-slate-100 text-slate-700 border-slate-200",
+        bg: "bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700",
       };
   }
 }
@@ -195,47 +188,56 @@ export function TreeNodeItem({
     }
   }
 
+  // Special rendering for Split View nodes in the hierarchy
+  if (node.node_type === "split_view") {
+    return (
+      <div style={{ paddingLeft: `${Math.max(depth * 16 + 4, 4)}px` }}>
+        <ZenSplitViewItem node={node} />
+      </div>
+    );
+  }
+
   const hasChildren = Boolean(node.children && node.children.length > 0);
   const badge = getNodeBadge(node.node_type);
   const BadgeIcon = badge.icon;
   const browserBadge = getBrowserBadge(node.browser_name);
+  const favicon = getFaviconUrl(node.url);
+  const domain = getDomain(node.url);
 
   const handleCopyUrl = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (node.url) {
       navigator.clipboard.writeText(node.url);
       setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    }
-  };
-
-  const getDomain = (urlStr: string) => {
-    try {
-      const url = new URL(urlStr);
-      return url.hostname.replace(/^www\./, "");
-    } catch {
-      return urlStr;
+      setTimeout(() => setCopied(false), 1600);
     }
   };
 
   const isRoot = node.node_type === "root" || depth === 0;
+  const isFolder = node.node_type === "folder";
+  const isWorkspace = node.node_type === "workspace";
+  const isPinned = node.node_type === "pinned_tab";
 
   return (
     <div className="flex flex-col select-none group/node">
       {/* Node Row */}
       <div
         onClick={() => hasChildren && setExpanded(!expanded)}
-        className={`flex items-center gap-2 py-1.5 px-2.5 rounded-xl transition-all duration-150 ${
+        className={`flex items-center gap-2 py-1.5 px-2.5 rounded-xl transition-all duration-150 active:scale-[0.99] ${
           hasChildren ? "cursor-pointer" : "cursor-default"
         } ${
           isRoot
-            ? "bg-slate-100/80 hover:bg-slate-100 border border-slate-200/80 my-1 shadow-sm font-semibold"
-            : "hover:bg-slate-100/60 border border-transparent hover:border-slate-200/60"
+            ? "bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/70 border border-slate-200/90 dark:border-slate-700/90 my-1 shadow-xs font-semibold"
+            : isWorkspace
+            ? "bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/60 dark:hover:bg-purple-900/30 border border-purple-200/60 dark:border-purple-800/60 my-0.5"
+            : isFolder
+            ? "hover:bg-amber-50/50 dark:hover:bg-amber-950/20 border border-transparent hover:border-amber-200/50"
+            : "hover:bg-slate-100/70 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200/60"
         }`}
-        style={{ paddingLeft: `${Math.max(depth * 18 + 8, 8)}px` }}
+        style={{ paddingLeft: `${Math.max(depth * 16 + 8, 8)}px` }}
       >
         {/* Expand / Collapse Chevron */}
-        <div className="w-4 h-4 flex items-center justify-center shrink-0 text-slate-400 group-hover/node:text-slate-600">
+        <div className="w-4 h-4 flex items-center justify-center shrink-0 text-slate-400 group-hover/node:text-slate-600 dark:group-hover/node:text-slate-200 transition-colors">
           {hasChildren ? (
             expanded ? (
               <ChevronDown className="w-3.5 h-3.5" />
@@ -243,11 +245,11 @@ export function TreeNodeItem({
               <ChevronRight className="w-3.5 h-3.5" />
             )
           ) : (
-            <span className="w-1 h-1 rounded-full bg-slate-300 ml-1" />
+            <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600 ml-1" />
           )}
         </div>
 
-        {/* Node Icon / Type Badge */}
+        {/* Node Icon / Zen 3D Folder / Badge */}
         {isRoot ? (
           <div className="flex items-center gap-1.5 shrink-0">
             <span
@@ -256,13 +258,37 @@ export function TreeNodeItem({
               {browserBadge.label}
             </span>
             {node.profile_name && (
-              <span className="text-[11px] font-medium text-slate-500 bg-slate-200/70 px-1.5 py-0.5 rounded">
+              <span className="text-[11px] font-medium text-slate-500 bg-slate-200/70 dark:bg-slate-800 px-1.5 py-0.5 rounded">
                 {node.profile_name}
               </span>
             )}
           </div>
+        ) : isFolder ? (
+          /* Zen Signature 3D Folder Flap */
+          <div className="flex items-center gap-1.5 shrink-0">
+            <ZenFolderIcon isOpen={expanded} size={20} />
+            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-200 dark:border-amber-800">
+              Folder
+            </span>
+          </div>
+        ) : isWorkspace ? (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <div className="w-4 h-4 rounded-md bg-purple-600 text-white flex items-center justify-center shadow-xs">
+              <Layers className="w-2.5 h-2.5" />
+            </div>
+            <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/60 px-1.5 py-0.2 rounded border border-purple-200 dark:border-purple-800">
+              Space
+            </span>
+          </div>
         ) : (
           <div className="flex items-center gap-1 shrink-0">
+            {favicon ? (
+              <img
+                src={favicon}
+                alt=""
+                className="w-3.5 h-3.5 object-contain rounded shrink-0 mr-0.5"
+              />
+            ) : null}
             <span
               className={`inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${badge.className}`}
             >
@@ -277,27 +303,27 @@ export function TreeNodeItem({
           <span
             className={`text-xs truncate ${
               isRoot
-                ? "text-slate-900 font-semibold"
-                : node.node_type === "workspace" || node.node_type === "folder"
-                ? "text-slate-800 font-medium"
-                : "text-slate-700"
+                ? "text-slate-900 dark:text-white font-semibold"
+                : isWorkspace || isFolder
+                ? "text-slate-900 dark:text-slate-100 font-semibold"
+                : "text-slate-700 dark:text-slate-300 font-normal"
             }`}
             title={node.title || "(Untitled)"}
           >
-            {node.title || (node.url ? getDomain(node.url) : "(Untitled)")}
+            {node.title || (node.url ? domain : "(Untitled)")}
           </span>
 
-          {/* Child count for folders/workspaces */}
+          {/* Child count */}
           {hasChildren && (
-            <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded-full">
+            <span className="text-[10px] font-medium text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded-full">
               {node.children?.length}
             </span>
           )}
 
           {/* Hostname / Domain */}
           {node.url && (
-            <span className="hidden sm:inline-block text-[11px] text-slate-400 hover:text-cyan-600 transition-colors truncate max-w-[200px] lg:max-w-[320px]">
-              {getDomain(node.url)}
+            <span className="hidden sm:inline-block text-[10px] text-slate-400 hover:text-cyan-600 transition-colors truncate max-w-[200px]">
+              {domain}
             </span>
           )}
         </div>
@@ -308,7 +334,7 @@ export function TreeNodeItem({
             <button
               onClick={handleCopyUrl}
               title="Copy URL"
-              className="p-1 rounded-md text-slate-400 hover:text-cyan-700 hover:bg-cyan-50 border border-transparent hover:border-cyan-200 transition-all"
+              className="p-1 rounded-md text-slate-400 hover:text-cyan-700 hover:bg-cyan-50 dark:hover:bg-slate-800 border border-transparent hover:border-cyan-200 transition-all"
             >
               {copied ? (
                 <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -322,7 +348,7 @@ export function TreeNodeItem({
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               title="Open tab in new window"
-              className="p-1 rounded-md text-slate-400 hover:text-indigo-700 hover:bg-indigo-50 border border-transparent hover:border-indigo-200 transition-all"
+              className="p-1 rounded-md text-slate-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-slate-800 border border-transparent hover:border-indigo-200 transition-all"
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
@@ -332,7 +358,7 @@ export function TreeNodeItem({
 
       {/* Children Nodes (Recursive) */}
       {hasChildren && expanded && (
-        <div className="flex flex-col border-l border-slate-200/70 ml-4 pl-1 space-y-0.5">
+        <div className="flex flex-col border-l border-slate-200/70 dark:border-slate-800 ml-4 pl-1 space-y-0.5">
           {node.children!.map((child) => (
             <TreeNodeItem
               key={child.id || `${child.node_type}_${child.sort_order}_${child.title}`}
