@@ -42,6 +42,7 @@ export interface SyncResult {
 
 export interface AppPreferences {
   selectedBrowser: string;
+  deviceName: string;
 }
 
 export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
@@ -65,6 +66,10 @@ export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
       };
       setSelectedBrowser: {
         params: { selectedBrowser: string };
+        response: void;
+      };
+      setDeviceName: {
+        params: { deviceName: string };
         response: void;
       };
     };

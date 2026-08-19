@@ -28,6 +28,14 @@ const treeContainerEl = document.getElementById("tree-container")!;
 const syncBtn = document.getElementById("sync-btn")!;
 const searchInput = document.getElementById("search-input") as HTMLInputElement;
 const browserFilter = document.getElementById("browser-filter") as HTMLSelectElement;
+const settingsBtn = document.getElementById("settings-btn")!;
+const settingsDialog = document.getElementById("settings-dialog") as HTMLDialogElement;
+const settingsForm = document.getElementById("settings-form") as HTMLFormElement;
+const closeSettingsBtn = document.getElementById("close-settings-btn")!;
+const cancelSettingsBtn = document.getElementById("cancel-settings-btn")!;
+const saveSettingsBtn = document.getElementById("save-settings-btn") as HTMLButtonElement;
+const deviceNameInput = document.getElementById("device-name-input") as HTMLInputElement;
+let savedDeviceName = "";
 
 function showSyncError(errors: { browser: string; message: string }[] | undefined) {
   const message = errors?.map((error) => `${error.browser}: ${error.message}`).join("\n") || "Unknown sync error";
@@ -199,10 +207,46 @@ browserFilter.addEventListener("change", async () => {
   await loadData();
 });
 
+function closeSettings() {
+  deviceNameInput.value = savedDeviceName;
+  settingsDialog.close();
+}
+
+settingsBtn.addEventListener("click", () => {
+  deviceNameInput.value = savedDeviceName;
+  settingsDialog.showModal();
+  deviceNameInput.focus();
+  deviceNameInput.select();
+});
+
+closeSettingsBtn.addEventListener("click", closeSettings);
+cancelSettingsBtn.addEventListener("click", closeSettings);
+
+settingsForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const deviceName = deviceNameInput.value.trim();
+  if (!deviceName) {
+    deviceNameInput.focus();
+    return;
+  }
+
+  saveSettingsBtn.disabled = true;
+  try {
+    await rpc.request.setDeviceName({ deviceName });
+    savedDeviceName = deviceName;
+    settingsDialog.close();
+  } catch (err) {
+    console.error("Failed to save device name:", err);
+  } finally {
+    saveSettingsBtn.disabled = false;
+  }
+});
+
 // Initial Load
 async function initialize() {
   try {
-    const { selectedBrowser } = await rpc.request.getAppPreferences();
+    const { selectedBrowser, deviceName } = await rpc.request.getAppPreferences();
+    savedDeviceName = deviceName;
     if ([...browserFilter.options].some((option) => option.value === selectedBrowser)) {
       browserFilter.value = selectedBrowser;
     }

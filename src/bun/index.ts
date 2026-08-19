@@ -27,6 +27,9 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
       setSelectedBrowser: ({ selectedBrowser }) => {
         db.setSelectedBrowser(selectedBrowser);
       },
+      setDeviceName: ({ deviceName }) => {
+        db.setDeviceName(deviceName);
+      },
     },
   },
 });

@@ -73,6 +73,9 @@
             <option value="dia">Dia Browser</option>
           </select>
         </div>
+        <button id="settings-btn" class="icon-btn" type="button" aria-label="Open settings" title="Settings">
+          <span aria-hidden="true">⚙️</span>
+        </button>
       </header>
 
       <div class="content-scroll">
@@ -86,6 +89,29 @@
       </div>
     </main>
   </div>
+
+  <dialog id="settings-dialog" class="settings-dialog" aria-labelledby="settings-title">
+    <form id="settings-form" class="settings-form" method="dialog">
+      <div class="dialog-header">
+        <div>
+          <h2 id="settings-title">Settings</h2>
+          <p>Customize how this device appears in SyncTable.</p>
+        </div>
+        <button id="close-settings-btn" class="icon-btn dialog-close-btn" type="button" aria-label="Close settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>
+        </button>
+      </div>
+      <div class="settings-field">
+        <label for="device-name-input">Device name</label>
+        <input id="device-name-input" name="deviceName" type="text" maxlength="100" autocomplete="off" required>
+        <p>Used to identify this computer when your browser data is synced.</p>
+      </div>
+      <div class="dialog-actions">
+        <button id="cancel-settings-btn" class="secondary-btn" type="button">Cancel</button>
+        <button id="save-settings-btn" class="primary-btn" type="submit">Save changes</button>
+      </div>
+    </form>
+  </dialog>
 
   <script type="module" src="index.js"></script>
 </body>

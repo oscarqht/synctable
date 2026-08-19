@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { hostname } from "node:os";
 import { SyncTableDB } from "./db";
 import type { BrowserTreeNode } from "../shared/types";
 
@@ -28,5 +29,15 @@ describe("SyncTableDB", () => {
     expect(db.getAllNodes("dia").map((node) => [node.id, node.profile_name])).toEqual([
       ["merged", "Default"],
     ]);
+  });
+
+  test("uses the system device name until a custom device name is saved", () => {
+    const db = new SyncTableDB(":memory:");
+
+    expect(db.getAppPreferences().deviceName).toBe(hostname());
+
+    db.setDeviceName("  Tanya's MacBook Pro  ");
+
+    expect(db.getAppPreferences().deviceName).toBe("Tanya's MacBook Pro");
   });
 });

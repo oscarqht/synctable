@@ -55,6 +55,12 @@ function containerRoots(space: ArcItem): { id: string; pinned: boolean }[] {
   return roots;
 }
 
+function topAppContainerIds(container: any): string[] {
+  const values = container?.topAppsContainerIDs;
+  if (!Array.isArray(values)) return [];
+  return values.filter((value: unknown): value is string => typeof value === "string");
+}
+
 export function parseArcSidebar(options: ArcParserOptions): BrowserTreeNode[] {
   const { filePath, osType, profileName, snapshotTime } = options;
   if (!existsSync(filePath)) return [];
@@ -70,9 +76,21 @@ export function parseArcSidebar(options: ArcParserOptions): BrowserTreeNode[] {
   addNode({ id: windowId, node_type: "window", title: "Main Window", url: null, parent_id: rootId, sort_order: 0 });
 
   let workspaceIndex = 0;
-  for (const container of containers) {
-    const spaces = toArcMap(container?.spaces);
+  for (const [containerIndex, container] of containers.entries()) {
+    let spaces = toArcMap(container?.spaces);
     const items = toArcMap(container?.items);
+    const favoriteContainerIds = topAppContainerIds(container);
+    if (favoriteContainerIds.length > 0) {
+      // Arc keeps Favorites in a profile-level top-apps container rather than
+      // in any Space. Model it as its own leading workspace so it appears once
+      // in the tree without duplicating the same favorites under every Space.
+      const favoriteSpace: ArcItem = {
+        id: `arc-favorites-${containerIndex}`,
+        title: "Favorites",
+        newContainerIDs: favoriteContainerIds.flatMap((id) => [{ favorites: true }, id]),
+      };
+      spaces = new Map([[favoriteSpace.id!, favoriteSpace], ...spaces]);
+    }
     for (const [spaceKey, space] of spaces) {
       const workspaceId = `arc-space-${arcId(space.id ?? spaceKey, `space-${workspaceIndex}`)}`;
       addNode({ id: workspaceId, node_type: "workspace", title: space.title || `Space ${workspaceIndex + 1}`, url: null, parent_id: windowId, sort_order: workspaceIndex++ });

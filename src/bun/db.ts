@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite";
 import { join } from "node:path";
-import { homedir } from "node:os";
+import { homedir, hostname } from "node:os";
 import { mkdirSync } from "node:fs";
 import type { AppPreferences, BrowserTreeNode, SyncStats } from "../shared/types";
 
@@ -55,7 +55,14 @@ export class SyncTableDB {
       .query("SELECT value FROM app_preferences WHERE key = 'selectedBrowser'")
       .get() as { value: string } | null;
 
-    return { selectedBrowser: selectedBrowser?.value ?? "" };
+    const deviceName = this.db
+      .query("SELECT value FROM app_preferences WHERE key = 'deviceName'")
+      .get() as { value: string } | null;
+
+    return {
+      selectedBrowser: selectedBrowser?.value ?? "",
+      deviceName: deviceName?.value || hostname(),
+    };
   }
 
   public setSelectedBrowser(selectedBrowser: string) {
@@ -63,6 +70,18 @@ export class SyncTableDB {
       `INSERT INTO app_preferences (key, value) VALUES ('selectedBrowser', $selectedBrowser)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`
     ).run({ $selectedBrowser: selectedBrowser });
+  }
+
+  public setDeviceName(deviceName: string) {
+    const normalizedName = deviceName.trim();
+    if (!normalizedName) {
+      throw new Error("Device name cannot be empty");
+    }
+
+    this.db.prepare(
+      `INSERT INTO app_preferences (key, value) VALUES ('deviceName', $deviceName)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    ).run({ $deviceName: normalizedName });
   }
 
   public getWindowSize(): { width: number; height: number } | null {
