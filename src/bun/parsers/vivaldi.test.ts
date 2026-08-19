@@ -62,7 +62,29 @@ describe("parseVivaldiPreferences", () => {
     const tab = nodes.find((node) => node.url === "https://example.com/launch");
     const tabGroup = nodes.find((node) => node.node_type === "folder" && node.title === "Launch");
     expect(tab).toMatchObject({ node_type: "pinned_tab", title: "example.com", parent_id: tabGroup?.id });
-    expect(tabGroup?.parent_id).toContain("ws-sea");
+    expect(tabGroup?.parent_id).toContain("ws-default");
+  });
+
+  test("places tabs in the Vivaldi workspace recorded in their session metadata", () => {
+    const dir = mkdtempSync(join(tmpdir(), "synctable-vivaldi-"));
+    tempDirs.push(dir);
+    const preferences = join(dir, "Preferences");
+    const session = join(dir, "Session_test");
+    writeFileSync(preferences, JSON.stringify({ vivaldi: { workspaces: { list: [
+      { id: 100, name: "Tasks" }, { id: 200, name: "Sea" }, { id: 300, name: "Lab" },
+    ] } } }));
+    writeFileSync(session, Buffer.concat([
+      Buffer.from([0x53, 0x4e, 0x53, 0x53, 3, 0, 0, 0]),
+      command(0, Buffer.from([10, 0, 0, 0, 41, 0, 0, 0])), command(2, Buffer.from([41, 0, 0, 0, 0, 0, 0, 0])), navigation(41, "https://tasks.example"), tabData(41, { workspaceId: 100 }),
+      command(0, Buffer.from([10, 0, 0, 0, 42, 0, 0, 0])), command(2, Buffer.from([42, 0, 0, 0, 1, 0, 0, 0])), navigation(42, "https://sea.example"), tabData(42, { workspaceId: 200 }),
+      command(0, Buffer.from([10, 0, 0, 0, 43, 0, 0, 0])), command(2, Buffer.from([43, 0, 0, 0, 2, 0, 0, 0])), navigation(43, "https://lab.example"), tabData(43, { workspaceId: 300 }),
+    ]));
+
+    const nodes = parseVivaldiPreferences({ filePath: preferences, sessionFilePath: session, osType: "macos", profileName: "Default", snapshotTime: "now" });
+    const workspaceIdByTitle = new Map(nodes.filter((node) => node.node_type === "workspace").map((node) => [node.title, node.id]));
+    expect(nodes.find((node) => node.url === "https://tasks.example")?.parent_id).toBe(workspaceIdByTitle.get("Tasks"));
+    expect(nodes.find((node) => node.url === "https://sea.example")?.parent_id).toBe(workspaceIdByTitle.get("Sea"));
+    expect(nodes.find((node) => node.url === "https://lab.example")?.parent_id).toBe(workspaceIdByTitle.get("Lab"));
   });
 
   test("uses Vivaldi's fixed tab and stack metadata", () => {
