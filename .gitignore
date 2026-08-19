@@ -23,3 +23,6 @@ next-env.d.ts
 Thumbs.db
 src/native/bin/
 apps/synctable-desktop/src/native/bin/
+
+.env
+.env.local
