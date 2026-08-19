@@ -45,7 +45,20 @@ export class BrowserSyncManager {
           if (entry.isDirectory() && (entry.name === "Default" || entry.name.startsWith("Profile "))) {
             const prefPath = join(chromeUserData, entry.name, "Preferences");
             if (existsSync(prefPath)) {
-              profiles.push({ browser: "chrome", displayName: "Google Chrome", profileName: entry.name, sourcePath: prefPath });
+              const sessionsDir = join(chromeUserData, entry.name, "Sessions");
+              const sessionFiles = existsSync(sessionsDir)
+                ? readdirSync(sessionsDir)
+                    .filter((name) => name.startsWith("Session_"))
+                    .map((name) => join(sessionsDir, name))
+                    .sort((left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs)
+                : [];
+              profiles.push({
+                browser: "chrome",
+                displayName: "Google Chrome",
+                profileName: entry.name,
+                sourcePath: prefPath,
+                sessionPath: sessionFiles[0],
+              });
             }
           }
         }
@@ -134,8 +147,11 @@ export class BrowserSyncManager {
             snapshotTime: timestamp,
           });
         } else if (prof.browser === "chrome") {
+          const safeSessionFile = prof.sessionPath ? `${safeTmpFile}_session` : undefined;
+          if (prof.sessionPath && safeSessionFile) copyFileSync(prof.sessionPath, safeSessionFile);
           nodes = parseChromePreferences({
             filePath: safeTmpFile,
+            sessionFilePath: safeSessionFile,
             osType: this.osType,
             profileName: prof.profileName,
             snapshotTime: timestamp,
