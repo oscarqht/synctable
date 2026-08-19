@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncTable</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">⚡</div>
+        <div class="brand-text">
+          <h1>SyncTable</h1>
+          <span class="version">v0.1.0 • Electrobun</span>
+        </div>
+      </div>
+
+      <div class="stats-card">
+        <div class="stats-header">System Metrics</div>
+        <div class="stat-grid">
+          <div class="stat-item">
+            <span class="stat-val" id="stat-workspaces">0</span>
+            <span class="stat-label">Spaces</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val" id="stat-folders">0</span>
+            <span class="stat-label">Folders</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val" id="stat-tabs">0</span>
+            <span class="stat-label">Tabs</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-val" id="stat-total">0</span>
+            <span class="stat-label">Total Nodes</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="browsers-section">
+        <div class="section-title">Connected Browsers</div>
+        <div id="browsers-list" class="browsers-list">
+          <div class="browser-pill loading">Detecting browsers...</div>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="last-sync-label">Last Snapshot:</div>
+        <div id="last-sync-time" class="last-sync-value">Never</div>
+        <button id="sync-btn" class="primary-btn">
+          <span class="btn-icon">↻</span> Sync Now
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="topbar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" placeholder="Search tabs, folders, workspaces...">
+        </div>
+        <div class="filter-group">
+          <select id="browser-filter">
+            <option value="">All Browsers</option>
+            <option value="chrome">Google Chrome</option>
+            <option value="arc">Arc Browser</option>
+            <option value="vivaldi">Vivaldi</option>
+            <option value="zen">Zen Browser</option>
+          </select>
+        </div>
+      </header>
+
+      <div class="content-scroll">
+        <div id="tree-container" class="tree-container">
+          <div class="empty-state">
+            <div class="empty-icon">📂</div>
+            <h3>No Browser Snapshots Yet</h3>
+            <p>Click "Sync Now" on the sidebar to poll and parse your local browser trees.</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="index.js"></script>
+</body>
+</html>

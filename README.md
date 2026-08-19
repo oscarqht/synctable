@@ -97,6 +97,29 @@ CREATE INDEX idx_browser_parent ON browser_trees (browser_name, parent_id);
 
 ---
 
+## 🚀 Getting Started
+
+### Prerequisites
+- [Bun](https://bun.sh) (v1.1+)
+
+### Installation & Development
+```bash
+# Install dependencies
+bun install
+
+# Run in development mode with live reload
+bun dev
+
+# Typecheck TypeScript
+bun run typecheck
+
+# Build standalone desktop distribution
+bun run build
+```
+
+---
+
 ## 📖 Documentation
 
 For detailed technical specifications, risk mitigations, and implementation strategies, refer to the [Product Requirements Document (PRD)](docs/PRD.md).
+
