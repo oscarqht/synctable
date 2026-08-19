@@ -13,3 +13,4 @@ artifacts/
 # OS files
 .DS_Store
 Thumbs.db
+src/native/bin/

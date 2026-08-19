@@ -5,8 +5,9 @@ const rpc = Electroview.defineRPC<SyncTableRPCSchema>({
   handlers: {
     requests: {},
     messages: {
-      syncComplete: () => {
-        loadData();
+      syncComplete: (result) => {
+        if (result.success) loadData();
+        else showSyncError(result.errors);
       },
     },
   },
@@ -27,6 +28,13 @@ const treeContainerEl = document.getElementById("tree-container")!;
 const syncBtn = document.getElementById("sync-btn")!;
 const searchInput = document.getElementById("search-input") as HTMLInputElement;
 const browserFilter = document.getElementById("browser-filter") as HTMLSelectElement;
+
+function showSyncError(errors: { browser: string; message: string }[] | undefined) {
+  const message = errors?.map((error) => `${error.browser}: ${error.message}`).join("\n") || "Unknown sync error";
+  lastSyncTimeEl.textContent = "Sync failed";
+  lastSyncTimeEl.title = message;
+  console.error("Sync failed:", message);
+}
 
 async function loadData() {
   try {
@@ -164,7 +172,11 @@ syncBtn.addEventListener("click", async () => {
   syncBtn.setAttribute("disabled", "true");
 
   try {
-    await rpc.request.triggerSync();
+    const result = await rpc.request.triggerSync();
+    if (!result.success) {
+      showSyncError(result.errors);
+      return;
+    }
     await loadData();
   } catch (err) {
     console.error("Sync failed:", err);

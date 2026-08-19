@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, copyFileSync, readdirSync, statSync } from "node
 import { join } from "node:path";
 import { homedir, platform } from "node:os";
 import type { BrowserTreeNode, OSType, SyncResult, SyncStats } from "../shared/types";
-import { parseArcSidebar, parseChromePreferences, parseVivaldiPreferences, parseZenSessionstore } from "./parsers";
+import { parseArcSidebar, parseChromePreferences, parseDiaTree, parseVivaldiPreferences, parseZenSessionstore } from "./parsers";
 import type { SyncTableDB } from "./db";
 
 export class BrowserSyncManager {
@@ -86,6 +86,14 @@ export class BrowserSyncManager {
           }
         }
       }
+
+      // Dia stores its complete hierarchy in encrypted per-profile tabs.db
+      // files. The local reader opens those databases read-only with the key
+      // derived from Dia Safe Storage in macOS Keychain.
+      const diaUserData = join(appSupport, "Dia", "User Data");
+      if (existsSync(diaUserData)) {
+        profiles.push({ browser: "dia", displayName: "Dia Browser", profileName: "Default", sourcePath: diaUserData });
+      }
     }
 
     return profiles;
@@ -99,6 +107,21 @@ export class BrowserSyncManager {
 
     for (const prof of profiles) {
       try {
+        if (prof.browser === "dia") {
+          const nodes = parseDiaTree({
+            userDataPath: prof.sourcePath,
+            osType: this.osType,
+            snapshotTime: timestamp,
+          });
+          if (nodes.length > 0) {
+            // Dia's profile databases are merged into one browser-wide tree.
+            // Remove legacy per-profile roots as part of every replacement.
+            this.db.replaceBrowserNodes(prof.browser, nodes);
+            syncedNodesCount += nodes.length;
+          }
+          continue;
+        }
+
         const safeTmpFile = join(this.cacheDir, `${prof.browser}_${prof.profileName.replace(/\s+/g, "_")}_${Date.now()}`);
         copyFileSync(prof.sourcePath, safeTmpFile);
 
@@ -162,6 +185,7 @@ export class BrowserSyncManager {
       { name: "arc", displayName: "Arc Browser" },
       { name: "vivaldi", displayName: "Vivaldi" },
       { name: "zen", displayName: "Zen Browser" },
+      { name: "dia", displayName: "Dia Browser" },
     ];
 
     baseStats.detectedBrowsers = browsers.map((b) => {

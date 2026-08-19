@@ -11,8 +11,8 @@ const DB_PATH = join(DB_DIR, "synctable.sqlite");
 export class SyncTableDB {
   private db: Database;
 
-  constructor() {
-    this.db = new Database(DB_PATH);
+  constructor(path = DB_PATH) {
+    this.db = new Database(path);
     this.initSchema();
   }
 
@@ -143,6 +143,37 @@ export class SyncTableDB {
       deleteStmt.run({ $browserName: browserName, $profileName: profileName });
       for (const item of items) {
         upsertStmt.run({
+          $id: item.id,
+          $browser_name: item.browser_name,
+          $os_type: item.os_type,
+          $profile_name: item.profile_name,
+          $node_type: item.node_type,
+          $title: item.title,
+          $url: item.url,
+          $parent_id: item.parent_id,
+          $sort_order: item.sort_order,
+          $snapshot_time: item.snapshot_time,
+        });
+      }
+    })(nodes);
+  }
+
+  public replaceBrowserNodes(browserName: string, nodes: BrowserTreeNode[]) {
+    const deleteStmt = this.db.prepare(
+      "DELETE FROM browser_trees WHERE browser_name = $browserName"
+    );
+    const insertStmt = this.db.prepare(`
+      INSERT INTO browser_trees (
+        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time
+      ) VALUES (
+        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time
+      )
+    `);
+
+    this.db.transaction((items: BrowserTreeNode[]) => {
+      deleteStmt.run({ $browserName: browserName });
+      for (const item of items) {
+        insertStmt.run({
           $id: item.id,
           $browser_name: item.browser_name,
           $os_type: item.os_type,
