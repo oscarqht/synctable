@@ -24,6 +24,14 @@
   padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 body {
@@ -366,13 +374,15 @@ body {
   inset: 0;
   margin: auto;
   height: fit-content;
-  width: min(440px, calc(100vw - 40px));
+  max-height: 85vh;
+  width: min(480px, calc(100vw - 40px));
   padding: 0;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 14px;
   background: #1a1d29;
   color: var(--text-primary);
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
 }
 
 .settings-dialog::backdrop {
@@ -383,6 +393,7 @@ body {
 .settings-form {
   display: flex;
   flex-direction: column;
+  max-height: 85vh;
 }
 
 .dialog-header {
@@ -391,6 +402,7 @@ body {
   justify-content: space-between;
   gap: 20px;
   padding: 24px 24px 18px;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .dialog-header h2 {
@@ -399,12 +411,33 @@ body {
   letter-spacing: -0.01em;
 }
 
-.dialog-header p,
-.settings-field p {
-  margin-top: 5px;
+.dialog-header p {
+  margin-top: 4px;
   color: var(--text-secondary);
   font-size: 13px;
   line-height: 1.45;
+}
+
+.dialog-body {
+  padding: 16px 24px 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .dialog-close-btn {
@@ -414,12 +447,13 @@ body {
 }
 
 .settings-field {
-  padding: 4px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .settings-field label {
   display: block;
-  margin-bottom: 8px;
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 600;
@@ -434,7 +468,7 @@ body {
   outline: none;
   background: rgba(255, 255, 255, 0.055);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   user-select: text;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
@@ -442,6 +476,56 @@ body {
 .settings-field input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
+.settings-field .field-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.settings-field .link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.settings-field .link:hover {
+  text-decoration: underline;
+}
+
+.password-input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-group input {
+  padding-right: 42px;
+}
+
+.toggle-visibility-btn {
+  position: absolute;
+  right: 4px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+}
+
+.toggle-visibility-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+}
+
+.toggle-visibility-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.hidden {
+  display: none !important;
 }
 
 .dialog-actions {
@@ -474,3 +558,4 @@ body {
   cursor: wait;
   opacity: 0.65;
 }
+

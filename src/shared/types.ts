@@ -43,6 +43,7 @@ export interface SyncResult {
 export interface AppPreferences {
   selectedBrowser: string;
   deviceName: string;
+  raindropToken?: string;
 }
 
 export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
@@ -70,6 +71,18 @@ export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
       };
       setDeviceName: {
         params: { deviceName: string };
+        response: void;
+      };
+      getRaindropToken: {
+        params: void;
+        response: string;
+      };
+      setRaindropToken: {
+        params: { token: string };
+        response: void;
+      };
+      openExternalURL: {
+        params: { url: string };
         response: void;
       };
     };

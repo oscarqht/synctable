@@ -31,7 +31,12 @@ const closeSettingsBtn = document.getElementById("close-settings-btn")!;
 const cancelSettingsBtn = document.getElementById("cancel-settings-btn")!;
 const saveSettingsBtn = document.getElementById("save-settings-btn") as HTMLButtonElement;
 const deviceNameInput = document.getElementById("device-name-input") as HTMLInputElement;
+const raindropTokenInput = document.getElementById("raindrop-token-input") as HTMLInputElement;
+const toggleTokenVisibilityBtn = document.getElementById("toggle-token-visibility-btn") as HTMLButtonElement;
+const eyeIcon = toggleTokenVisibilityBtn?.querySelector(".eye-icon") as SVGElement | null;
+const eyeOffIcon = toggleTokenVisibilityBtn?.querySelector(".eye-off-icon") as SVGElement | null;
 let savedDeviceName = "";
+let savedRaindropToken = "";
 
 function showSyncError(errors: { browser: string; message: string }[] | undefined) {
   const message = errors?.map((error) => `${error.browser}: ${error.message}`).join("\n") || "Unknown sync error";
@@ -198,13 +203,41 @@ browserFilter.addEventListener("change", async () => {
   await loadData();
 });
 
+function resetTokenVisibility() {
+  if (raindropTokenInput) {
+    raindropTokenInput.type = "password";
+  }
+  if (eyeIcon && eyeOffIcon) {
+    eyeIcon.classList.remove("hidden");
+    eyeOffIcon.classList.add("hidden");
+  }
+}
+
 function closeSettings() {
   deviceNameInput.value = savedDeviceName;
+  if (raindropTokenInput) {
+    raindropTokenInput.value = savedRaindropToken;
+  }
+  resetTokenVisibility();
   settingsDialog.close();
 }
 
+toggleTokenVisibilityBtn?.addEventListener("click", () => {
+  if (!raindropTokenInput) return;
+  const isPassword = raindropTokenInput.type === "password";
+  raindropTokenInput.type = isPassword ? "text" : "password";
+  if (eyeIcon && eyeOffIcon) {
+    eyeIcon.classList.toggle("hidden", isPassword);
+    eyeOffIcon.classList.toggle("hidden", !isPassword);
+  }
+});
+
 settingsBtn.addEventListener("click", () => {
   deviceNameInput.value = savedDeviceName;
+  if (raindropTokenInput) {
+    raindropTokenInput.value = savedRaindropToken;
+  }
+  resetTokenVisibility();
   settingsDialog.showModal();
   deviceNameInput.focus();
   deviceNameInput.select();
@@ -221,13 +254,19 @@ settingsForm.addEventListener("submit", async (event) => {
     return;
   }
 
+  const raindropToken = raindropTokenInput?.value.trim() ?? "";
+
   saveSettingsBtn.disabled = true;
   try {
-    await rpc.request.setDeviceName({ deviceName });
+    await Promise.all([
+      rpc.request.setDeviceName({ deviceName }),
+      rpc.request.setRaindropToken({ token: raindropToken }),
+    ]);
     savedDeviceName = deviceName;
-    settingsDialog.close();
+    savedRaindropToken = raindropToken;
+    closeSettings();
   } catch (err) {
-    console.error("Failed to save device name:", err);
+    console.error("Failed to save settings:", err);
   } finally {
     saveSettingsBtn.disabled = false;
   }
@@ -236,8 +275,9 @@ settingsForm.addEventListener("submit", async (event) => {
 // Initial Load
 async function initialize() {
   try {
-    const { selectedBrowser, deviceName } = await rpc.request.getAppPreferences();
+    const { selectedBrowser, deviceName, raindropToken } = await rpc.request.getAppPreferences();
     savedDeviceName = deviceName;
+    savedRaindropToken = raindropToken || "";
     if ([...browserFilter.options].some((option) => option.value === selectedBrowser)) {
       browserFilter.value = selectedBrowser;
     }
@@ -247,5 +287,17 @@ async function initialize() {
 
   await loadData();
 }
+
+// Open external links in default browser
+document.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement | null;
+  const link = target?.closest("a") as HTMLAnchorElement | null;
+  if (link && link.href && (link.href.startsWith("http://") || link.href.startsWith("https://"))) {
+    event.preventDefault();
+    rpc.request.openExternalURL({ url: link.href }).catch((err) => {
+      console.error("Failed to open external URL:", err);
+    });
+  }
+});
 
 initialize();

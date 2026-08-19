@@ -1,8 +1,9 @@
-import { ApplicationMenu, BrowserView, BrowserWindow, defineElectrobunRPC } from "electrobun/bun";
+import { ApplicationMenu, BrowserView, BrowserWindow, defineElectrobunRPC, Utils } from "electrobun/bun";
 import { existsSync } from "node:fs";
 import { platform } from "node:os";
 import { join } from "node:path";
 import { SyncTableDB } from "./db";
+import { defaultKeychain } from "./keychain";
 import { BrowserSyncManager } from "./sync";
 import type { SyncTableRPCSchema } from "../shared/types";
 
@@ -15,7 +16,35 @@ if (platform() === "darwin") {
   ApplicationMenu.setApplicationMenu([
     {
       label: "SyncTable",
-      submenu: [{ role: "quit", accelerator: "Command+Q" }],
+      submenu: [
+        { role: "about" },
+        { type: "divider" },
+        { role: "hide", accelerator: "Command+H" },
+        { role: "hideOthers", accelerator: "Command+Alt+H" },
+        { role: "showAll" },
+        { type: "divider" },
+        { role: "quit", accelerator: "Command+Q" },
+      ],
+    },
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo", accelerator: "Command+Z" },
+        { role: "redo", accelerator: "Command+Shift+Z" },
+        { type: "divider" },
+        { role: "cut", accelerator: "Command+X" },
+        { role: "copy", accelerator: "Command+C" },
+        { role: "paste", accelerator: "Command+V" },
+        { role: "selectAll", accelerator: "Command+A" },
+      ],
+    },
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize", accelerator: "Command+M" },
+        { role: "zoom" },
+        { role: "close", accelerator: "Command+W" },
+      ],
     },
   ]);
 }
@@ -34,13 +63,34 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
         return result;
       },
       getAppPreferences: () => {
-        return db.getAppPreferences();
+        const prefs = db.getAppPreferences();
+        const raindropToken = defaultKeychain.getRaindropToken();
+        return {
+          ...prefs,
+          raindropToken,
+        };
       },
       setSelectedBrowser: ({ selectedBrowser }) => {
         db.setSelectedBrowser(selectedBrowser);
       },
       setDeviceName: ({ deviceName }) => {
         db.setDeviceName(deviceName);
+      },
+      getRaindropToken: () => {
+        return defaultKeychain.getRaindropToken();
+      },
+      setRaindropToken: ({ token }) => {
+        defaultKeychain.setRaindropToken(token);
+      },
+      openExternalURL: ({ url }) => {
+        if (!url) return;
+        try {
+          Utils.openExternal(url);
+        } catch {
+          if (platform() === "darwin") {
+            Bun.spawn(["open", url]);
+          }
+        }
       },
     },
   },
