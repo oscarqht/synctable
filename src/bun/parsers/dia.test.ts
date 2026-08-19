@@ -36,6 +36,37 @@ function web(paneId: string, title: string, url = `https://${title.toLowerCase()
 }
 
 describe("buildDiaNodes", () => {
+  test("imports a Dia tab with multiple content panes as a split view", () => {
+    const nodes = buildDiaNodes({ databases: [database("Default", "tree-space", "Treeee", {
+      nodes: [
+        { id: "tree-window", kind: "window", entity_id: "tree-window-record", parent_id: null, order: 0, space_id: "tree-space", deleted_at: null },
+        { id: "split-tab", kind: "tab", entity_id: "split-tab-record", parent_id: "tree-window", order: 0, space_id: "tree-space", deleted_at: null },
+        pane("split-tab", "google-pane", 0),
+        pane("split-tab", "x-pane", 1),
+      ],
+      windows: [{ id: "tree-window-record", node_id: "tree-window", focused_space_id: "tree-space" }],
+      content_panes: [
+        { id: "google-pane", node_id: "google-pane-node", custom_title: null },
+        { id: "x-pane", node_id: "x-pane-node", custom_title: null },
+      ],
+      web_contents: [
+        { id: "google-web", content_pane_id: "google-pane", title: "Google", url: "https://www.google.com/" },
+        { id: "x-web", content_pane_id: "x-pane", title: "Home / X", url: "https://x.com/home" },
+      ],
+    })] }, { osType: "macos", snapshotTime: timestamp });
+
+    const splitView = nodes.find((node) => node.node_type === "split_view");
+    expect(splitView).toMatchObject({ title: "Split View" });
+    expect(nodes.filter((node) => node.parent_id === splitView?.id).map((node) => ({
+      type: node.node_type,
+      title: node.title,
+      url: node.url,
+    }))).toEqual([
+      { type: "tab", title: "Google", url: "https://www.google.com/" },
+      { type: "tab", title: "Home / X", url: "https://x.com/home" },
+    ]);
+  });
+
   test("merges profile databases into the complete ordered window, space, group, and tab tree", () => {
     const defaultPages = ["Extensions", "WhatsApp", "SeaTalk Web", "Google Calendar", "Google Tasks", "Trello", "Youtube"]
       .map((title, index) => web(`tree-pane-${index}`, title));

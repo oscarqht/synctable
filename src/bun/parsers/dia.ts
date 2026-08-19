@@ -272,7 +272,23 @@ function appendLogicalNode(
     return;
   }
 
-  const metadata = tabMetadata(profile, source);
+  const panes = tabPanes(profile, source);
+  if (panes.length > 1) {
+    output.push(treeNode(id, "split_view", "Split View", null, parentId, sortOrder, options, profileName));
+    panes.forEach(({ node, metadata }, index) => output.push(treeNode(
+      `${id}-pane-${encodeURIComponent(node.id)}`,
+      pinned ? "pinned_tab" : "tab",
+      metadata.title,
+      metadata.url,
+      id,
+      index,
+      options,
+      profileName,
+    )));
+    return;
+  }
+
+  const metadata = panes[0]?.metadata || { title: "New Tab", url: null };
   output.push(treeNode(
     id,
     pinned ? "pinned_tab" : "tab",
@@ -285,7 +301,7 @@ function appendLogicalNode(
   ));
 }
 
-function tabMetadata(profile: ProfileModel, tabNode: DiaNode): { title: string; url: string | null } {
+function tabPanes(profile: ProfileModel, tabNode: DiaNode): Array<{ node: DiaNode; metadata: { title: string; url: string | null } }> {
   const paneNodes: DiaNode[] = [];
   const visit = (node: DiaNode) => {
     for (const child of profile.childrenByParent.get(node.id) || []) {
@@ -296,9 +312,9 @@ function tabMetadata(profile: ProfileModel, tabNode: DiaNode): { title: string; 
   visit(tabNode);
   paneNodes.sort(compareNodes);
 
-  for (const paneNode of paneNodes) {
+  return paneNodes.flatMap((paneNode) => {
     const pane = findEntityRow(profile.rows.content_panes || [], paneNode);
-    if (!pane) continue;
+    if (!pane) return [];
     const paneId = stringValue(pane, "id") || paneNode.entityId;
     const web = (profile.rows.web_contents || []).find((row) => stringValue(row, "content_pane_id", "contentPaneID", "contentPaneId") === paneId);
     const supertab = (profile.rows.supertabs || []).find((row) => stringValue(row, "content_pane_id", "contentPaneID", "contentPaneId") === paneId);
@@ -308,9 +324,8 @@ function tabMetadata(profile: ProfileModel, tabNode: DiaNode): { title: string; 
       || (web ? stringValue(web, "title") : "")
       || (isNewTabUrl(url) ? "New Tab" : url)
       || "New Tab";
-    return { title, url };
-  }
-  return { title: "New Tab", url: null };
+    return [{ node: paneNode, metadata: { title, url } }];
+  });
 }
 
 function isNewTabUrl(url: string | null): boolean {
