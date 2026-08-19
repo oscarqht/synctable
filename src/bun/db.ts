@@ -78,6 +78,37 @@ export class SyncTableDB {
     transaction(nodes);
   }
 
+  public replaceProfileNodes(browserName: string, profileName: string, nodes: BrowserTreeNode[]) {
+    const deleteStmt = this.db.prepare(
+      "DELETE FROM browser_trees WHERE browser_name = $browserName AND profile_name = $profileName"
+    );
+    const upsertStmt = this.db.prepare(`
+      INSERT INTO browser_trees (
+        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time
+      ) VALUES (
+        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time
+      )
+    `);
+
+    this.db.transaction((items: BrowserTreeNode[]) => {
+      deleteStmt.run({ $browserName: browserName, $profileName: profileName });
+      for (const item of items) {
+        upsertStmt.run({
+          $id: item.id,
+          $browser_name: item.browser_name,
+          $os_type: item.os_type,
+          $profile_name: item.profile_name,
+          $node_type: item.node_type,
+          $title: item.title,
+          $url: item.url,
+          $parent_id: item.parent_id,
+          $sort_order: item.sort_order,
+          $snapshot_time: item.snapshot_time,
+        });
+      }
+    })(nodes);
+  }
+
   public getAllNodes(browserName?: string, profileName?: string): BrowserTreeNode[] {
     let query = "SELECT * FROM browser_trees";
     const params: any = {};
@@ -96,7 +127,7 @@ export class SyncTableDB {
       query += " WHERE " + conditions.join(" AND ");
     }
 
-    query += " ORDER BY sort_order ASC, title ASC";
+    query += " ORDER BY sort_order ASC, id ASC";
 
     return this.db.query(query).all(params) as BrowserTreeNode[];
   }

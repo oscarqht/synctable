@@ -64,9 +64,14 @@ export class BrowserSyncManager {
         const entries = readdirSync(zenProfilesDir, { withFileTypes: true });
         for (const entry of entries) {
           if (entry.isDirectory()) {
-            const sessionPath = join(zenProfilesDir, entry.name, "sessionstore.jsonlz4");
-            if (existsSync(sessionPath)) {
-              profiles.push({ browser: "zen", displayName: "Zen Browser", profileName: entry.name, sourcePath: sessionPath });
+            const profileDir = join(zenProfilesDir, entry.name);
+            // sessionstore.jsonlz4 is only present after Zen exits. While Zen is
+            // running, its current tabs, spaces, and folders are in recovery.jsonlz4.
+            const recoveryPath = join(profileDir, "sessionstore-backups", "recovery.jsonlz4");
+            const sessionPath = join(profileDir, "sessionstore.jsonlz4");
+            const sourcePath = existsSync(recoveryPath) ? recoveryPath : sessionPath;
+            if (existsSync(sourcePath)) {
+              profiles.push({ browser: "zen", displayName: "Zen Browser", profileName: entry.name, sourcePath });
             }
           }
         }
@@ -79,7 +84,7 @@ export class BrowserSyncManager {
   public runSync(): SyncResult {
     const timestamp = new Date().toISOString();
     const profiles = this.getBrowserProfiles();
-    const allNodes: BrowserTreeNode[] = [];
+    let syncedNodesCount = 0;
     const errors: { browser: string; message: string }[] = [];
 
     for (const prof of profiles) {
@@ -119,20 +124,17 @@ export class BrowserSyncManager {
         }
 
         if (nodes.length > 0) {
-          allNodes.push(...nodes);
+          this.db.replaceProfileNodes(prof.browser, prof.profileName, nodes);
+          syncedNodesCount += nodes.length;
         }
       } catch (err: any) {
         errors.push({ browser: prof.browser, message: err?.message || String(err) });
       }
     }
 
-    if (allNodes.length > 0) {
-      this.db.upsertNodes(allNodes);
-    }
-
     return {
       success: errors.length === 0,
-      syncedNodesCount: allNodes.length,
+      syncedNodesCount,
       timestamp,
       errors: errors.length > 0 ? errors : undefined,
     };
