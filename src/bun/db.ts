@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
-import type { BrowserTreeNode, SyncStats } from "../shared/types";
+import type { AppPreferences, BrowserTreeNode, SyncStats } from "../shared/types";
 
 const DB_DIR = join(homedir(), ".browser_sync_cache");
 mkdirSync(DB_DIR, { recursive: true });
@@ -41,6 +41,55 @@ export class SyncTableDB {
       CREATE INDEX IF NOT EXISTS idx_browser_snapshot
       ON browser_trees (snapshot_time);
     `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS app_preferences (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `);
+  }
+
+  public getAppPreferences(): AppPreferences {
+    const selectedBrowser = this.db
+      .query("SELECT value FROM app_preferences WHERE key = 'selectedBrowser'")
+      .get() as { value: string } | null;
+
+    return { selectedBrowser: selectedBrowser?.value ?? "" };
+  }
+
+  public setSelectedBrowser(selectedBrowser: string) {
+    this.db.prepare(
+      `INSERT INTO app_preferences (key, value) VALUES ('selectedBrowser', $selectedBrowser)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    ).run({ $selectedBrowser: selectedBrowser });
+  }
+
+  public getWindowSize(): { width: number; height: number } | null {
+    const width = this.db
+      .query("SELECT value FROM app_preferences WHERE key = 'windowWidth'")
+      .get() as { value: string } | null;
+    const height = this.db
+      .query("SELECT value FROM app_preferences WHERE key = 'windowHeight'")
+      .get() as { value: string } | null;
+    const parsedWidth = Number(width?.value);
+    const parsedHeight = Number(height?.value);
+
+    return Number.isFinite(parsedWidth) && Number.isFinite(parsedHeight) && parsedWidth > 0 && parsedHeight > 0
+      ? { width: parsedWidth, height: parsedHeight }
+      : null;
+  }
+
+  public setWindowSize(width: number, height: number) {
+    const savePreference = this.db.prepare(`
+      INSERT INTO app_preferences (key, value) VALUES ($key, $value)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `);
+
+    this.db.transaction(() => {
+      savePreference.run({ $key: "windowWidth", $value: String(width) });
+      savePreference.run({ $key: "windowHeight", $value: String(height) });
+    })();
   }
 
   public upsertNodes(nodes: BrowserTreeNode[]) {

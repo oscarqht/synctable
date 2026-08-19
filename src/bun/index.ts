@@ -5,6 +5,8 @@ import type { SyncTableRPCSchema } from "../shared/types";
 
 const db = new SyncTableDB();
 const syncManager = new BrowserSyncManager(db);
+const DEFAULT_WINDOW_FRAME = { x: 120, y: 80, width: 1150, height: 780 };
+const savedWindowSize = db.getWindowSize();
 
 const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
   handlers: {
@@ -19,6 +21,12 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
         const result = syncManager.runSync();
         return result;
       },
+      getAppPreferences: () => {
+        return db.getAppPreferences();
+      },
+      setSelectedBrowser: ({ selectedBrowser }) => {
+        db.setSelectedBrowser(selectedBrowser);
+      },
     },
   },
 });
@@ -27,10 +35,8 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
 const win = new BrowserWindow({
   title: "SyncTable",
   frame: {
-    x: 120,
-    y: 80,
-    width: 1150,
-    height: 780,
+    ...DEFAULT_WINDOW_FRAME,
+    ...savedWindowSize,
   },
   url: "views://mainview/index.html",
   renderer: "native",
@@ -44,6 +50,16 @@ const win = new BrowserWindow({
   viewsRoot: null,
   navigationRules: null,
 });
+
+let saveWindowSizeTimer: Timer | undefined;
+const saveWindowSize = (event: unknown) => {
+  const { width, height } = (event as { data: { width: number; height: number } }).data;
+  clearTimeout(saveWindowSizeTimer);
+  saveWindowSizeTimer = setTimeout(() => db.setWindowSize(width, height), 250);
+};
+
+win.on("resize", saveWindowSize);
+win.on("close", () => db.setWindowSize(win.getSize().width, win.getSize().height));
 
 // Background sync loop (10 minutes)
 const SYNC_INTERVAL_MS = 10 * 60 * 1000;
