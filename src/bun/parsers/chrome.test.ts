@@ -25,6 +25,14 @@ function navigation(tabId: number, url: string) {
   return command(6, payload);
 }
 
+function splitTab(tabId: number, splitToken: Buffer, hasSplit = true) {
+  const payload = Buffer.alloc(32);
+  payload.writeInt32LE(tabId, 0);
+  splitToken.copy(payload, 8);
+  payload[24] = hasSplit ? 1 : 0;
+  return command(36, payload);
+}
+
 describe("parseChromePreferences", () => {
   test("imports Chrome session windows, tabs, pins, and current tab groups", () => {
     const dir = mkdtempSync(join(tmpdir(), "synctable-chrome-"));
@@ -50,5 +58,45 @@ describe("parseChromePreferences", () => {
     expect(nodes.filter((node) => node.node_type === "window")).toHaveLength(2);
     expect(nodes.find((node) => node.url === "https://example.org")).toMatchObject({ node_type: "pinned_tab", parent_id: group?.id });
     expect(nodes.find((node) => node.url === "https://example.com")?.parent_id).toContain("win-10-ws-default");
+  });
+
+  test("groups Chrome split-view tabs under a split view", () => {
+    const dir = mkdtempSync(join(tmpdir(), "synctable-chrome-"));
+    tempDirs.push(dir);
+    const preferences = join(dir, "Preferences");
+    const session = join(dir, "Session_test");
+    writeFileSync(preferences, "{}");
+    const splitToken = Buffer.alloc(16);
+    splitToken.writeBigUInt64LE(11n, 0);
+    splitToken.writeBigUInt64LE(22n, 8);
+    writeFileSync(session, Buffer.concat([
+      Buffer.from([0x53, 0x4e, 0x53, 0x53, 3, 0, 0, 0]),
+      command(0, Buffer.from([10, 0, 0, 0, 41, 0, 0, 0])), command(2, Buffer.from([41, 0, 0, 0, 0, 0, 0, 0])), navigation(41, "https://left.example"), splitTab(41, splitToken),
+      command(0, Buffer.from([10, 0, 0, 0, 42, 0, 0, 0])), command(2, Buffer.from([42, 0, 0, 0, 1, 0, 0, 0])), navigation(42, "https://right.example"), splitTab(42, splitToken),
+    ]));
+
+    const nodes = parseChromePreferences({ filePath: preferences, sessionFilePath: session, osType: "macos", profileName: "Default", snapshotTime: "now" });
+    const splitView = nodes.find((node) => node.node_type === "split_view");
+    expect(splitView).toMatchObject({ title: "Split View", parent_id: expect.stringContaining("ws-default") });
+    expect(nodes.filter((node) => node.parent_id === splitView?.id).map((node) => node.url)).toEqual(["https://left.example", "https://right.example"]);
+  });
+
+  test("removes a Chrome tab from a split view when its session record clears it", () => {
+    const dir = mkdtempSync(join(tmpdir(), "synctable-chrome-"));
+    tempDirs.push(dir);
+    const preferences = join(dir, "Preferences");
+    const session = join(dir, "Session_test");
+    writeFileSync(preferences, "{}");
+    const splitToken = Buffer.alloc(16);
+    splitToken.writeBigUInt64LE(11n, 0);
+    splitToken.writeBigUInt64LE(22n, 8);
+    writeFileSync(session, Buffer.concat([
+      Buffer.from([0x53, 0x4e, 0x53, 0x53, 3, 0, 0, 0]),
+      command(0, Buffer.from([10, 0, 0, 0, 41, 0, 0, 0])), command(2, Buffer.from([41, 0, 0, 0, 0, 0, 0, 0])), navigation(41, "https://example.com"), splitTab(41, splitToken), splitTab(41, splitToken, false),
+    ]));
+
+    const nodes = parseChromePreferences({ filePath: preferences, sessionFilePath: session, osType: "macos", profileName: "Default", snapshotTime: "now" });
+    expect(nodes.some((node) => node.node_type === "split_view")).toBe(false);
+    expect(nodes.find((node) => node.url === "https://example.com")?.parent_id).toContain("ws-default");
   });
 });

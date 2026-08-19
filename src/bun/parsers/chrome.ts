@@ -17,6 +17,7 @@ type SessionTab = {
   title?: string;
   pinned: boolean;
   groupId?: string;
+  splitId?: string;
 };
 
 type TabGroup = { id: string; title: string };
@@ -90,6 +91,12 @@ function parseSessionSnapshot(sessionFilePath?: string): { tabs: SessionTab[]; g
       // snapshots use a UTF-8 pickle at the same position.
       const title = readPickleString16(payload, 20) || readPickleString(payload, 20);
       groups.set(groupId, { id: groupId, title: title || "Tab Group" });
+    } else if (command === 36 && payload.length >= 25) { // SetSplitTab
+      // Chromium serializes SplitTabPayload as an aligned C++ struct:
+      // tab ID, four bytes of padding, a 128-bit split token, then has_split.
+      // A later command with has_split unset removes a tab from the split.
+      const value = tab(payload.readInt32LE(0));
+      value.splitId = payload[24] !== 0 ? tokenId(payload, 8) : undefined;
     } else if (command === 16 && payload.length >= 4) { // TabClosed
       tabs.delete(payload.readInt32LE(0));
     }
@@ -144,8 +151,21 @@ export function parseChromePreferences(options: ChromeParserOptions): BrowserTre
       nodes.push({ id: `chrome-${profileName}-group-${groupId}`, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "folder", title, url: null, parent_id: workspaceId, sort_order: firstTabIndex, snapshot_time: snapshotTime });
     }
 
+    const splitIds = new Set(windowTabs.flatMap((item) => item.splitId ? [item.splitId] : []));
+    const splitNodeId = (splitId: string) => `chrome-${profileName}-win-${sourceWindowId}-split-${splitId}`;
+    for (const splitId of splitIds) {
+      const firstTabIndex = Math.min(...windowTabs.filter((item) => item.splitId === splitId).map((item) => item.index));
+      nodes.push({ id: splitNodeId(splitId), browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "split_view", title: "Split View", url: null, parent_id: workspaceId, sort_order: firstTabIndex, snapshot_time: snapshotTime });
+    }
+
     windowTabs.sort((left, right) => left.index - right.index || left.id - right.id).forEach((item) => {
-      const parentId = item.groupId && groupIds.has(item.groupId) ? `chrome-${profileName}-group-${item.groupId}` : workspaceId;
+      // Split views are a non-nestable tab collection. Prefer that structure
+      // when a split tab also belongs to a regular tab group.
+      const parentId = item.splitId && splitIds.has(item.splitId)
+        ? splitNodeId(item.splitId)
+        : item.groupId && groupIds.has(item.groupId)
+          ? `chrome-${profileName}-group-${item.groupId}`
+          : workspaceId;
       nodes.push({ id: `chrome-${profileName}-tab-${item.id}`, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: item.pinned ? "pinned_tab" : "tab", title: item.title || tabTitle(item.url!), url: item.url!, parent_id: parentId, sort_order: item.index, snapshot_time: snapshotTime });
     });
 
