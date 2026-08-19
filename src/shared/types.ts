@@ -40,6 +40,10 @@ export interface SyncResult {
   errors?: { browser: string; message: string }[];
 }
 
+export interface AppPreferences {
+  selectedBrowser: string;
+}
+
 export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
   bun: {
     requests: {
@@ -54,6 +58,14 @@ export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
       triggerSync: {
         params: void;
         response: SyncResult;
+      };
+      getAppPreferences: {
+        params: void;
+        response: AppPreferences;
+      };
+      setSelectedBrowser: {
+        params: { selectedBrowser: string };
+        response: void;
       };
     };
     messages: {

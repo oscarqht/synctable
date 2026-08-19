@@ -2,7 +2,7 @@ import { Database } from "bun:sqlite";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
-import type { BrowserTreeNode, SyncStats } from "../shared/types";
+import type { AppPreferences, BrowserTreeNode, SyncStats } from "../shared/types";
 
 const DB_DIR = join(homedir(), ".browser_sync_cache");
 mkdirSync(DB_DIR, { recursive: true });
@@ -41,6 +41,55 @@ export class SyncTableDB {
       CREATE INDEX IF NOT EXISTS idx_browser_snapshot
       ON browser_trees (snapshot_time);
     `);
+
+    this.db.run(`
+      CREATE TABLE IF NOT EXISTS app_preferences (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      );
+    `);
+  }
+
+  public getAppPreferences(): AppPreferences {
+    const selectedBrowser = this.db
+      .query("SELECT value FROM app_preferences WHERE key = 'selectedBrowser'")
+      .get() as { value: string } | null;
+
+    return { selectedBrowser: selectedBrowser?.value ?? "" };
+  }
+
+  public setSelectedBrowser(selectedBrowser: string) {
+    this.db.prepare(
+      `INSERT INTO app_preferences (key, value) VALUES ('selectedBrowser', $selectedBrowser)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+    ).run({ $selectedBrowser: selectedBrowser });
+  }
+
+  public getWindowSize(): { width: number; height: number } | null {
+    const width = this.db
+      .query("SELECT value FROM app_preferences WHERE key = 'windowWidth'")
+      .get() as { value: string } | null;
+    const height = this.db
+      .query("SELECT value FROM app_preferences WHERE key = 'windowHeight'")
+      .get() as { value: string } | null;
+    const parsedWidth = Number(width?.value);
+    const parsedHeight = Number(height?.value);
+
+    return Number.isFinite(parsedWidth) && Number.isFinite(parsedHeight) && parsedWidth > 0 && parsedHeight > 0
+      ? { width: parsedWidth, height: parsedHeight }
+      : null;
+  }
+
+  public setWindowSize(width: number, height: number) {
+    const savePreference = this.db.prepare(`
+      INSERT INTO app_preferences (key, value) VALUES ($key, $value)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `);
+
+    this.db.transaction(() => {
+      savePreference.run({ $key: "windowWidth", $value: String(width) });
+      savePreference.run({ $key: "windowHeight", $value: String(height) });
+    })();
   }
 
   public upsertNodes(nodes: BrowserTreeNode[]) {
@@ -78,6 +127,37 @@ export class SyncTableDB {
     transaction(nodes);
   }
 
+  public replaceProfileNodes(browserName: string, profileName: string, nodes: BrowserTreeNode[]) {
+    const deleteStmt = this.db.prepare(
+      "DELETE FROM browser_trees WHERE browser_name = $browserName AND profile_name = $profileName"
+    );
+    const upsertStmt = this.db.prepare(`
+      INSERT INTO browser_trees (
+        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time
+      ) VALUES (
+        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time
+      )
+    `);
+
+    this.db.transaction((items: BrowserTreeNode[]) => {
+      deleteStmt.run({ $browserName: browserName, $profileName: profileName });
+      for (const item of items) {
+        upsertStmt.run({
+          $id: item.id,
+          $browser_name: item.browser_name,
+          $os_type: item.os_type,
+          $profile_name: item.profile_name,
+          $node_type: item.node_type,
+          $title: item.title,
+          $url: item.url,
+          $parent_id: item.parent_id,
+          $sort_order: item.sort_order,
+          $snapshot_time: item.snapshot_time,
+        });
+      }
+    })(nodes);
+  }
+
   public getAllNodes(browserName?: string, profileName?: string): BrowserTreeNode[] {
     let query = "SELECT * FROM browser_trees";
     const params: any = {};
@@ -96,7 +176,7 @@ export class SyncTableDB {
       query += " WHERE " + conditions.join(" AND ");
     }
 
-    query += " ORDER BY sort_order ASC, title ASC";
+    query += " ORDER BY sort_order ASC, id ASC";
 
     return this.db.query(query).all(params) as BrowserTreeNode[];
   }

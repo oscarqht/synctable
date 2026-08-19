@@ -178,9 +178,27 @@ searchInput.addEventListener("input", () => {
   renderTree(currentTrees, searchInput.value.trim());
 });
 
-browserFilter.addEventListener("change", () => {
-  loadData();
+browserFilter.addEventListener("change", async () => {
+  try {
+    await rpc.request.setSelectedBrowser({ selectedBrowser: browserFilter.value });
+  } catch (err) {
+    console.error("Failed to save selected browser:", err);
+  }
+  await loadData();
 });
 
 // Initial Load
-loadData();
+async function initialize() {
+  try {
+    const { selectedBrowser } = await rpc.request.getAppPreferences();
+    if ([...browserFilter.options].some((option) => option.value === selectedBrowser)) {
+      browserFilter.value = selectedBrowser;
+    }
+  } catch (err) {
+    console.error("Failed to restore app preferences:", err);
+  }
+
+  await loadData();
+}
+
+initialize();
