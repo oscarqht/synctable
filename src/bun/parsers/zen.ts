@@ -137,8 +137,10 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
         browser_name: "zen",
         os_type: osType,
         profile_name: profileName,
-        node_type: "folder",
-        title: folder?.name || "Folder",
+        // Zen stores split-tab collections in the same `folders` array as
+        // ordinary folders. `splitViewGroup` is the distinguishing flag.
+        node_type: folder?.splitViewGroup ? "split_view" : "folder",
+        title: folder?.name || (folder?.splitViewGroup ? "Split View" : "Folder"),
         url: null,
         parent_id: parentId,
         sort_order: folderSortOrders.get(String(folder.id)) ?? folderIdx,

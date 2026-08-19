@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
-import { parseZenSessionstore } from "./zen";
+import { parseZenSessionData, parseZenSessionstore } from "./zen";
 
 const tempDirs: string[] = [];
 
@@ -73,5 +73,56 @@ describe("parseZenSessionstore", () => {
     expect(folder?.sort_order).toBe(0);
     expect(laterFolder?.sort_order).toBe(3);
     expect(nodes.some((node) => node.url === "about:blank")).toBe(false);
+  });
+
+  test("imports Zen split-view groups as split views instead of folders", () => {
+    const nodes = parseZenSessionData({
+      windows: [{
+        spaces: [{ uuid: "space-tree", name: "Treeee" }],
+        folders: [
+          { id: "folder-synctable", name: "Synctable", workspaceId: "space-tree", parentId: null },
+          {
+            id: "split-synctable",
+            name: "",
+            parentId: "folder-synctable",
+            splitViewGroup: true,
+            workspaceId: null,
+          },
+        ],
+        tabs: [
+          {
+            entries: [{ url: "about:blank" }],
+            index: 1,
+            zenIsEmpty: true,
+            groupId: "folder-synctable",
+          },
+          {
+            entries: [{ url: "https://trello.example/synctable", title: "Synctable task" }],
+            index: 1,
+            groupId: "split-synctable",
+            zenWorkspace: "space-tree",
+          },
+          {
+            entries: [{ url: "https://github.example/oscarqht/synctable", title: "Synctable repo" }],
+            index: 1,
+            groupId: "split-synctable",
+            zenWorkspace: "space-tree",
+          },
+        ],
+      }],
+    }, {
+      osType: "macos",
+      profileName: "Default",
+      snapshotTime: "2026-08-19T00:00:00.000Z",
+    });
+
+    const folder = nodes.find((node) => node.title === "Synctable");
+    const splitView = nodes.find((node) => node.node_type === "split_view");
+    expect(splitView).toMatchObject({ title: "Split View", parent_id: folder?.id });
+    expect(nodes.filter((node) => node.parent_id === splitView?.id).map((node) => node.url)).toEqual([
+      "https://trello.example/synctable",
+      "https://github.example/oscarqht/synctable",
+    ]);
+    expect(nodes.some((node) => node.node_type === "folder" && node.id?.includes("split-synctable"))).toBe(false);
   });
 });
