@@ -259,14 +259,14 @@ export default function Home() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white border border-sky-200/60 flex items-center justify-center shadow-xs text-lg select-none">
               🔄
             </div>
-            <div>
+            <div className="flex flex-col sm:block justify-center">
               <div className="font-bold text-base tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 bg-clip-text text-transparent flex items-center gap-2">
                 SyncTable{" "}
-                <span className="text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200">
+                <span className="hidden sm:inline-flex text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200">
                   Web
                 </span>
               </div>
-              <p className="text-[11px] text-slate-500">
+              <p className="hidden sm:block text-[11px] text-slate-500">
                 Cross-Browser Tab & Workspace Sync
               </p>
             </div>
@@ -297,7 +297,7 @@ export default function Home() {
                   <span className="hidden sm:inline">Refresh</span>
                 </button>
 
-                <div className="h-10 flex items-center space-x-2.5 bg-slate-100/90 border border-slate-200/90 rounded-xl pl-2 pr-3.5 backdrop-blur shadow-xs">
+                <div className="hidden sm:flex h-10 items-center space-x-2.5 bg-slate-100/90 border border-slate-200/90 rounded-xl pl-2 pr-3.5 backdrop-blur shadow-xs">
                   {user.avatarUrl ? (
                     <img
                       src={user.avatarUrl}
