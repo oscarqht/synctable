@@ -123,7 +123,7 @@ export function ZenTabItem({
 
       {/* Hover Action Buttons */}
       {tab.url && (
-        <div className="opacity-0 group-hover/tab:opacity-100 flex items-center gap-1 transition-opacity shrink-0">
+        <div className="opacity-100 md:opacity-0 md:group-hover/tab:opacity-100 flex items-center gap-1 transition-opacity shrink-0">
           <button
             onClick={handleCopyUrl}
             title="Copy URL"

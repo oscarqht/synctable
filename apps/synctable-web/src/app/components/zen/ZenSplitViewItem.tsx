@@ -121,7 +121,7 @@ export function ZenSplitViewItem({
                   </span>
 
                   {tab.url && (
-                    <div className="opacity-0 group-hover/pane:opacity-100 flex items-center gap-0.5 transition-opacity">
+                    <div className="opacity-100 md:opacity-0 md:group-hover/pane:opacity-100 flex items-center gap-0.5 transition-opacity">
                       <button
                         onClick={(e) => handleCopyUrl(e, tab)}
                         title="Copy URL"

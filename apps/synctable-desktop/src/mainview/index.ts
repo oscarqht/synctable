@@ -301,3 +301,9 @@ document.addEventListener("click", (event) => {
 });
 
 initialize();
+
+// Auto refresh data every 1 minute
+const REFRESH_INTERVAL_MS = 60 * 1000;
+setInterval(() => {
+  loadData();
+}, REFRESH_INTERVAL_MS);

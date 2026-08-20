@@ -61,14 +61,119 @@ export function pruneEmptyNodes(node: BrowserTreeNode): BrowserTreeNode | null {
  */
 export function countWorkspaces(node: BrowserTreeNode): number {
   if (!node) return 0;
-  let count = 0;
-  if (node.node_type === "workspace" && countTabs(node) > 0) {
-    count++;
-  }
-  if (node.children && Array.isArray(node.children)) {
-    for (const child of node.children) {
-      count += countWorkspaces(child);
+  return extractWorkspacesFromRoot(node).length;
+}
+
+export interface WorkspaceItem {
+  id: string;
+  browserName: string;
+  browserTitle: string;
+  profileName: string;
+  windowTitle?: string;
+  workspaceTitle: string;
+  node: BrowserTreeNode;
+  tabCount: number;
+}
+
+/**
+ * Extracts individual non-empty workspace units from a browser root node.
+ * For browsers with multiple profiles, windows, or workspaces, each workspace is returned
+ * so it can be rendered as a separate card.
+ */
+export function extractWorkspacesFromRoot(rawRootNode: BrowserTreeNode): WorkspaceItem[] {
+  const rootNode = pruneEmptyNodes(rawRootNode);
+  if (!rootNode || countTabs(rootNode) === 0) return [];
+
+  const browserName = (rootNode.browser_name || "browser").toLowerCase();
+  const browserTitle = rootNode.title || rootNode.browser_name || "Browser";
+  const profileName = rootNode.profile_name || "Default";
+
+  const list: WorkspaceItem[] = [];
+
+  // Check if rootNode has window children
+  const windowChildren = (rootNode.children || []).filter(
+    (c) => c.node_type === "window" && countTabs(c) > 0
+  );
+
+  if (windowChildren.length > 0) {
+    for (const win of windowChildren) {
+      const workspaceChildren = (win.children || []).filter(
+        (c) => c.node_type === "workspace" && countTabs(c) > 0
+      );
+
+      if (workspaceChildren.length > 0) {
+        for (const ws of workspaceChildren) {
+          let wsTitle = ws.title?.trim() || "";
+          if (!wsTitle || wsTitle === "Default Workspace" || wsTitle === "Main Workspace") {
+            if (win.title && win.title !== "Main Window" && win.title !== "Default") {
+              wsTitle = win.title;
+            } else {
+              wsTitle = ws.title || "Workspace";
+            }
+          }
+
+          list.push({
+            id: ws.id || `${rootNode.id}-${win.id}-${ws.id}`,
+            browserName,
+            browserTitle,
+            profileName,
+            windowTitle: win.title || undefined,
+            workspaceTitle: wsTitle,
+            node: ws,
+            tabCount: countTabs(ws),
+          });
+        }
+      } else {
+        // Window has direct tabs/folders without workspace nodes
+        list.push({
+          id: win.id || `${rootNode.id}-${win.id}`,
+          browserName,
+          browserTitle,
+          profileName,
+          windowTitle: win.title || undefined,
+          workspaceTitle: win.title || "Main Window",
+          node: {
+            ...win,
+            node_type: "workspace",
+          },
+          tabCount: countTabs(win),
+        });
+      }
+    }
+  } else {
+    // No window children on rootNode. Check for workspace children directly.
+    const workspaceChildren = (rootNode.children || []).filter(
+      (c) => c.node_type === "workspace" && countTabs(c) > 0
+    );
+
+    if (workspaceChildren.length > 0) {
+      for (const ws of workspaceChildren) {
+        list.push({
+          id: ws.id || `${rootNode.id}-${ws.id}`,
+          browserName,
+          browserTitle,
+          profileName,
+          workspaceTitle: ws.title || "Workspace",
+          node: ws,
+          tabCount: countTabs(ws),
+        });
+      }
+    } else {
+      // Root has direct tabs/folders
+      list.push({
+        id: `${rootNode.id}-workspace`,
+        browserName,
+        browserTitle,
+        profileName,
+        workspaceTitle: rootNode.title || "Personal",
+        node: {
+          ...rootNode,
+          node_type: "workspace",
+        },
+        tabCount: countTabs(rootNode),
+      });
     }
   }
-  return count;
+
+  return list;
 }

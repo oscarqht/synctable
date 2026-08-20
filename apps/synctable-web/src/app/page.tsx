@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
   FolderTree,
   LogIn,
@@ -15,8 +15,6 @@ import {
   Search,
   Laptop,
   Monitor,
-  Maximize2,
-  Minimize2,
   Filter,
   CheckCircle2,
   ExternalLink,
@@ -31,10 +29,9 @@ import type {
   SynctableSyncResponse,
   BrowserTreeNode,
 } from "@/lib/types";
-import { countTabs, countWorkspaces, pruneEmptyNodes } from "@/lib/treeUtils";
+import { countTabs, countWorkspaces, pruneEmptyNodes, extractWorkspacesFromRoot } from "@/lib/treeUtils";
 import { TreeNodeItem } from "./components/TreeNodeItem";
 import { ZenSidebarView } from "./components/zen/ZenSidebarView";
-import { Sidebar, ListTree } from "lucide-react";
 
 function formatRelativeTime(dateString: string): string {
   try {
@@ -105,7 +102,7 @@ export default function Home() {
   }, []);
 
   // Fetch Synctable Root Collection & Device Files
-  const fetchSyncData = async () => {
+  const fetchSyncData = useCallback(async () => {
     if (!user) return;
     setSyncLoading(true);
     try {
@@ -113,10 +110,6 @@ export default function Home() {
       if (res.ok) {
         const data = (await res.json()) as SynctableSyncResponse;
         setSyncData(data);
-        // Default select first device if available and not 'all'
-        if (data.devices.length > 0 && selectedDeviceId === "all") {
-          setSelectedDeviceId("all");
-        }
       } else {
         const errorData = await res.json().catch(() => ({}));
         setErrorMessage(
@@ -129,13 +122,21 @@ export default function Home() {
     } finally {
       setSyncLoading(false);
     }
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchSyncData();
-    }
   }, [user]);
+
+  // Initial load and periodic auto-refresh every one minute (preserving filters & search query)
+  useEffect(() => {
+    if (!user) return;
+
+    fetchSyncData();
+
+    const AUTO_REFRESH_INTERVAL_MS = 60 * 1000;
+    const intervalId = setInterval(() => {
+      fetchSyncData();
+    }, AUTO_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [user, fetchSyncData]);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -216,8 +217,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20">
-              <FolderTree className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white border border-sky-200/60 flex items-center justify-center shadow-xs text-lg select-none">
+              🔄
             </div>
             <div>
               <div className="font-bold text-base tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 bg-clip-text text-transparent flex items-center gap-2">
@@ -241,23 +242,23 @@ export default function Home() {
               </div>
             ) : user ? (
               /* User Profile in Header */
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2.5">
                 {/* Refresh Sync Data Button */}
                 <button
                   onClick={fetchSyncData}
                   disabled={syncLoading}
                   title="Refresh Raindrop Synctable Data"
-                  className="flex items-center space-x-1.5 text-xs font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-lg transition-all shadow-xs hover:border-slate-300 active:scale-95"
+                  className="h-10 px-3.5 flex items-center space-x-2 text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl transition-all shadow-xs hover:border-slate-300 active:scale-95"
                 >
                   <RefreshCw
-                    className={`w-3.5 h-3.5 text-cyan-600 ${
+                    className={`w-4 h-4 text-cyan-600 ${
                       syncLoading ? "animate-spin" : ""
                     }`}
                   />
                   <span className="hidden sm:inline">Refresh</span>
                 </button>
 
-                <div className="flex items-center space-x-2.5 bg-slate-100/90 border border-slate-200/90 rounded-full pl-2 pr-3.5 py-1.5 backdrop-blur shadow-xs">
+                <div className="h-10 flex items-center space-x-2.5 bg-slate-100/90 border border-slate-200/90 rounded-xl pl-2 pr-3.5 backdrop-blur shadow-xs">
                   {user.avatarUrl ? (
                     <img
                       src={user.avatarUrl}
@@ -294,12 +295,12 @@ export default function Home() {
                   onClick={handleLogout}
                   disabled={loggingOut}
                   title="Sign out of Raindrop"
-                  className="flex items-center space-x-1.5 text-xs font-medium bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 px-3 py-1.5 rounded-lg transition-all shadow-xs"
+                  className="h-10 px-3.5 flex items-center space-x-2 text-xs font-semibold bg-white hover:bg-rose-50 text-slate-600 hover:text-rose-600 border border-slate-200 hover:border-rose-200 rounded-xl transition-all shadow-xs active:scale-95"
                 >
                   {loggingOut ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <LogOut className="w-3.5 h-3.5" />
+                    <LogOut className="w-4 h-4" />
                   )}
                   <span className="hidden sm:inline">Logout</span>
                 </button>
@@ -428,56 +429,6 @@ export default function Home() {
         ) : (
           /* AFTER LOGIN: Multi-Device Browser Tree Viewer */
           <div className="flex-1 flex flex-col space-y-6">
-            {/* Top Overview & Metrics Bar */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-bold tracking-tight text-slate-900">
-                    Device Workspaces & Trees
-                  </h1>
-                  {syncData?.collection && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      <CheckCircle2 className="w-3 h-3" />
-                      <span>Collection &quot;Synctable&quot; Active</span>
-                    </span>
-                  )}
-                </div>
-                <p className="text-xs text-slate-500">
-                  Inspecting snapshot trees fetched from your Raindrop Synctable
-                  collection.
-                </p>
-              </div>
-
-              {/* Aggregated Counters */}
-              <div className="flex items-center gap-3">
-                <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-center min-w-[76px]">
-                  <div className="text-lg font-extrabold text-slate-900 leading-none">
-                    {totalStats.totalDevices}
-                  </div>
-                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mt-1">
-                    Devices
-                  </div>
-                </div>
-
-                <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-center min-w-[76px]">
-                  <div className="text-lg font-extrabold text-cyan-700 leading-none">
-                    {totalStats.totalTabs}
-                  </div>
-                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mt-1">
-                    Tabs
-                  </div>
-                </div>
-
-                <div className="px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-center min-w-[76px]">
-                  <div className="text-lg font-extrabold text-indigo-700 leading-none">
-                    {totalStats.totalWorkspaces}
-                  </div>
-                  <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider mt-1">
-                    Spaces
-                  </div>
-                </div>
-              </div>
-            </div>
 
             {/* Syncing / Loading Overlay */}
             {syncLoading && !syncData ? (
@@ -683,85 +634,23 @@ export default function Home() {
 
                 {/* Filter & Search Toolbar */}
                 <div className="bg-white p-3.5 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    {/* Search Input */}
-                    <div className="relative flex-1 max-w-md">
-                      <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search tabs, URLs, or profiles..."
-                        className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all text-slate-800 placeholder:text-slate-400"
-                      />
-                      {searchQuery && (
-                        <button
-                          onClick={() => setSearchQuery("")}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Expand/Collapse, View Mode and Filter Actions */}
-                    <div className="flex items-center flex-wrap gap-2">
-                      {/* View Mode Switcher */}
-                      <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-2xs">
-                        <button
-                          onClick={() => setViewMode("zen_sidebar")}
-                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                            viewMode === "zen_sidebar"
-                              ? "bg-white dark:bg-slate-900 text-cyan-600 dark:text-cyan-400 shadow-xs"
-                              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                          }`}
-                        >
-                          <Sidebar className="w-3.5 h-3.5" />
-                          <span>Zen Sidebar</span>
-                        </button>
-                        <button
-                          onClick={() => setViewMode("tree")}
-                          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                            viewMode === "tree"
-                              ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs"
-                              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                          }`}
-                        >
-                          <ListTree className="w-3.5 h-3.5" />
-                          <span>Zen Tree</span>
-                        </button>
-                      </div>
-
-                      {/* Node Type Selector */}
-                      <select
-                        value={nodeTypeFilter}
-                        onChange={(e) => setNodeTypeFilter(e.target.value)}
-                        className="text-xs bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 cursor-pointer"
+                  <div className="relative w-full">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search tabs, URLs, or profiles..."
+                      className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all text-slate-800 placeholder:text-slate-400"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
                       >
-                        <option value="all">All Node Types</option>
-                        <option value="tabs">Tabs Only</option>
-                      </select>
-
-                      {/* Expand / Collapse All Toggle (Tree view) */}
-                      {viewMode === "tree" && (
-                        <button
-                          onClick={() => setTreeExpandedState(!treeExpandedState)}
-                          className="flex items-center space-x-1.5 text-xs font-medium bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1.5 rounded-xl transition-all shadow-2xs"
-                        >
-                          {treeExpandedState ? (
-                            <>
-                              <Minimize2 className="w-3.5 h-3.5" />
-                              <span>Collapse</span>
-                            </>
-                          ) : (
-                            <>
-                              <Maximize2 className="w-3.5 h-3.5" />
-                              <span>Expand</span>
-                            </>
-                          )}
-                        </button>
-                      )}
-                    </div>
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Browser Filter Chips */}
@@ -882,30 +771,33 @@ export default function Home() {
                           ) : viewMode === "zen_sidebar" ? (
                             /* Zen Browser Sidebar Mode */
                             <div className="space-y-6">
-                              {browserGroups.map(([browserName, browserTrees]) => (
-                                <div key={browserName} className="space-y-3">
-                                  {browserGroups.length > 1 && (
+                              {browserGroups.map(([browserName, browserTrees]) => {
+                                const workspaces = browserTrees.flatMap(extractWorkspacesFromRoot);
+                                if (workspaces.length === 0) return null;
+
+                                return (
+                                  <div key={browserName} className="space-y-3">
                                     <div className="flex items-center gap-2 px-1">
                                       <span className="text-xs uppercase font-bold tracking-wider text-slate-500">
                                         {browserName}
                                       </span>
+                                      <span className="text-[11px] font-medium text-slate-400">
+                                        ({workspaces.length} {workspaces.length === 1 ? "workspace" : "workspaces"})
+                                      </span>
                                     </div>
-                                  )}
-                                  {/* Arrange trees for the same browser horizontally as columns (single column on mobile) */}
-                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
-                                    {browserTrees.map((rootNode) => (
-                                      <ZenSidebarView
-                                        key={
-                                          rootNode.id ||
-                                          `${rootNode.browser_name}_${rootNode.profile_name}`
-                                        }
-                                        rootNode={rootNode}
-                                        searchQuery={searchQuery}
-                                      />
-                                    ))}
+                                    {/* Arrange each workspace as a separate card in the grid */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
+                                      {workspaces.map((wsItem) => (
+                                        <ZenSidebarView
+                                          key={wsItem.id}
+                                          workspaceItem={wsItem}
+                                          searchQuery={searchQuery}
+                                        />
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           ) : (
                             /* Zen Tree Hierarchy Mode */

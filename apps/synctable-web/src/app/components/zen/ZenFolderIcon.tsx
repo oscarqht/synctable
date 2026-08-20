@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { FolderIcon, FolderOpenIcon } from "@heroicons/react/24/outline";
+import { Folder, FolderOpen } from "lucide-react";
 
 interface ZenFolderIconProps {
   isOpen?: boolean;
@@ -14,7 +14,7 @@ export function ZenFolderIcon({
   className = "",
   size = 22,
 }: ZenFolderIconProps) {
-  const Icon = isOpen ? FolderOpenIcon : FolderIcon;
+  const Icon = isOpen ? FolderOpen : Folder;
 
   return (
     <div

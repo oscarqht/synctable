@@ -336,7 +336,7 @@ export function TreeNodeItem({
 
         {/* Actions for Tab Nodes */}
         {node.url && (
-          <div className="flex items-center gap-1 opacity-0 group-hover/node:opacity-100 transition-opacity shrink-0 ml-2">
+          <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover/node:opacity-100 transition-opacity shrink-0 ml-2">
             <button
               onClick={handleCopyUrl}
               title="Copy URL"

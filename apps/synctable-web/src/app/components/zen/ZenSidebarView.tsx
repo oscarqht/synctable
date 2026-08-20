@@ -1,107 +1,60 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Plus, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 import type { BrowserTreeNode } from "@/lib/types";
-import { countTabs, pruneEmptyNodes } from "@/lib/treeUtils";
-import { ZenWorkspaceBar } from "./ZenWorkspaceBar";
-import { ZenPinnedTabsSection } from "./ZenPinnedTabsSection";
+import { countTabs, pruneEmptyNodes, extractWorkspacesFromRoot, type WorkspaceItem } from "@/lib/treeUtils";
 import { ZenFolderItem } from "./ZenFolderItem";
 import { ZenSplitViewItem } from "./ZenSplitViewItem";
 import { ZenTabItem } from "./ZenTabItem";
 
-interface ZenSidebarViewProps {
-  rootNode: BrowserTreeNode;
+export interface ZenSidebarViewProps {
+  workspaceItem?: WorkspaceItem;
+  rootNode?: BrowserTreeNode;
   searchQuery?: string;
 }
 
 export function ZenSidebarView({
+  workspaceItem,
   rootNode: rawRootNode,
   searchQuery: externalSearch = "",
 }: ZenSidebarViewProps) {
-  const rootNode = useMemo(() => pruneEmptyNodes(rawRootNode) || rawRootNode, [rawRootNode]);
   const [internalSearch, setInternalSearch] = useState("");
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
 
   const activeSearch = externalSearch || internalSearch;
 
-  // Extract non-empty workspaces or fallback
-  const workspaces = useMemo<BrowserTreeNode[]>(() => {
-    const list: BrowserTreeNode[] = [];
-
-    function findWorkspaces(node: BrowserTreeNode) {
-      if (node.node_type === "workspace") {
-        if (countTabs(node) > 0) {
-          list.push(node);
-        }
-      } else if (node.children) {
-        for (const child of node.children) {
-          findWorkspaces(child);
-        }
-      }
+  // Resolve current workspace item from props
+  const currentWorkspaceItem = useMemo<WorkspaceItem | null>(() => {
+    if (workspaceItem) return workspaceItem;
+    if (rawRootNode) {
+      const extracted = extractWorkspacesFromRoot(rawRootNode);
+      if (extracted.length > 0) return extracted[0];
+      const pruned = pruneEmptyNodes(rawRootNode) || rawRootNode;
+      return {
+        id: pruned.id || "workspace",
+        browserName: (pruned.browser_name || "browser").toLowerCase(),
+        browserTitle: pruned.title || pruned.browser_name || "Browser",
+        profileName: pruned.profile_name || "Default",
+        workspaceTitle: pruned.title || "Workspace",
+        node: pruned,
+        tabCount: countTabs(pruned),
+      };
     }
+    return null;
+  }, [workspaceItem, rawRootNode]);
 
-    findWorkspaces(rootNode);
+  const workspaceNode = currentWorkspaceItem?.node;
 
-    if (list.length === 0) {
-      const validChildren = (rootNode.children || []).filter((c) => countTabs(c) > 0);
-      if (validChildren.length === 0) return [];
-      return [
-        {
-          id: `${rootNode.id}-default-space`,
-          browser_name: rootNode.browser_name,
-          os_type: rootNode.os_type,
-          profile_name: rootNode.profile_name,
-          node_type: "workspace",
-          title: "Personal",
-          url: null,
-          parent_id: rootNode.id,
-          sort_order: 0,
-          snapshot_time: rootNode.snapshot_time,
-          children: validChildren,
-        },
-      ];
-    }
+  // Collect all items in this workspace (pinned tabs, folders, split views, regular tabs)
+  const allItems = useMemo(() => {
+    if (!workspaceNode?.children) return [];
+    return workspaceNode.children.filter((item) => countTabs(item) > 0);
+  }, [workspaceNode]);
 
-    return list;
-  }, [rootNode]);
-
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>(
-    workspaces[0]?.id || ""
-  );
-
-  React.useEffect(() => {
-    if (workspaces.length > 0 && !workspaces.some((w) => w.id === activeWorkspaceId)) {
-      setActiveWorkspaceId(workspaces[0].id);
-    }
-  }, [workspaces, activeWorkspaceId]);
-
-  const activeWorkspace = useMemo(() => {
-    return workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0];
-  }, [workspaces, activeWorkspaceId]);
-
-  // Categorize items in active workspace: Pinned tabs, Folders, Split views, Regular tabs
-  const { pinnedTabs, regularItems } = useMemo(() => {
-    const pinned: BrowserTreeNode[] = [];
-    const regular: BrowserTreeNode[] = [];
-
-    const items = activeWorkspace?.children || [];
-
-    for (const item of items) {
-      if (countTabs(item) === 0) continue;
-      if (item.node_type === "pinned_tab") {
-        pinned.push(item);
-      } else {
-        regular.push(item);
-      }
-    }
-
-    return { pinnedTabs: pinned, regularItems: regular };
-  }, [activeWorkspace]);
-
-  // Filter regular items by search
+  // Filter items by search query
   const filteredItems = useMemo(() => {
-    if (!activeSearch) return regularItems;
+    if (!activeSearch) return allItems;
     const q = activeSearch.toLowerCase();
 
     function matchRecursive(node: BrowserTreeNode): boolean {
@@ -115,26 +68,85 @@ export function ZenSidebarView({
       return false;
     }
 
-    return regularItems.filter(matchRecursive);
-  }, [regularItems, activeSearch]);
+    return allItems.filter(matchRecursive);
+  }, [allItems, activeSearch]);
+
+  // Categorize filtered items into pinned tabs and regular items
+  const { pinnedTabs, regularItems } = useMemo(() => {
+    const pinned: BrowserTreeNode[] = [];
+    const regular: BrowserTreeNode[] = [];
+
+    for (const item of filteredItems) {
+      if (item.node_type === "pinned_tab") {
+        pinned.push(item);
+      } else {
+        regular.push(item);
+      }
+    }
+
+    return { pinnedTabs: pinned, regularItems: regular };
+  }, [filteredItems]);
 
   const handleSelectTab = (tab: BrowserTreeNode) => {
     setActiveTabId(tab.id || null);
   };
 
-  if (countTabs(rootNode) === 0) {
+  const renderItem = (item: BrowserTreeNode, idx: number) => {
+    if (item.node_type === "folder") {
+      return (
+        <ZenFolderItem
+          key={item.id || `folder_${idx}`}
+          folder={item}
+          activeTabId={activeTabId}
+          onSelectTab={handleSelectTab}
+        />
+      );
+    }
+
+    if (item.node_type === "split_view") {
+      return (
+        <ZenSplitViewItem
+          key={item.id || `split_${idx}`}
+          node={item}
+          onSelectTab={handleSelectTab}
+        />
+      );
+    }
+
+    return (
+      <ZenTabItem
+        key={item.id || `tab_${idx}`}
+        tab={item}
+        isPinned={item.node_type === "pinned_tab"}
+        isActive={activeTabId === item.id}
+        onSelect={handleSelectTab}
+      />
+    );
+  };
+
+  if (!currentWorkspaceItem || currentWorkspaceItem.tabCount === 0) {
     return null;
   }
 
+  const { browserTitle, profileName, workspaceTitle, tabCount } = currentWorkspaceItem;
+
   return (
     <div className="flex flex-col bg-slate-100/90 dark:bg-slate-900/90 border border-slate-200/80 dark:border-slate-800/80 rounded-3xl p-3 sm:p-4 shadow-sm w-full transition-all">
-      {/* Top Controls: Browser / Profile Info */}
+      {/* Top Controls: Browser & Profile Info + Tab Count */}
       <div className="flex items-center justify-between w-full pb-2 mb-2">
         <div className="flex items-center gap-2 min-w-0 px-1">
           <span className="text-xs font-bold text-slate-800 dark:text-slate-200 capitalize truncate">
-            {rootNode.title || rootNode.browser_name || "Browser"}
+            {browserTitle}
           </span>
+          {profileName && profileName !== "Default" && (
+            <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500 truncate max-w-[120px]">
+              ({profileName})
+            </span>
+          )}
         </div>
+        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800/60 px-2 py-0.5 rounded-full shrink-0">
+          {tabCount} {tabCount === 1 ? "tab" : "tabs"}
+        </span>
       </div>
 
       {/* Search Input */}
@@ -159,72 +171,35 @@ export function ZenSidebarView({
         </div>
       )}
 
-      {/* 1. Pinned / Essentials Top Row */}
-      {pinnedTabs.length > 0 && (
-        <ZenPinnedTabsSection
-          pinnedTabs={pinnedTabs}
-          activeTabId={activeTabId}
-          onSelectTab={handleSelectTab}
-        />
+      {/* 1. Clean Workspace Label */}
+      {workspaceTitle && (
+        <div className="px-3.5 pt-1 pb-1 select-none">
+          <span className="text-xs sm:text-[13px] font-semibold text-slate-500/80 dark:text-slate-400/80 tracking-tight">
+            {workspaceTitle}
+          </span>
+        </div>
       )}
 
-      {/* 2. Workspace Header ("Personal") */}
-      {workspaces.length > 0 && (
-        <ZenWorkspaceBar
-          workspaces={workspaces}
-          activeWorkspaceId={activeWorkspaceId}
-          onSelectWorkspace={setActiveWorkspaceId}
-        />
-      )}
-
-      {/* 3. Tab and Folder List */}
+      {/* 2. Tab and Folder List */}
       <div className="flex-1 w-full space-y-1 my-1">
         {filteredItems.length === 0 ? (
           <div className="py-6 text-center text-xs text-slate-400">
             No tabs in this workspace
           </div>
         ) : (
-          filteredItems.map((item, idx) => {
-            if (item.node_type === "folder") {
-              return (
-                <ZenFolderItem
-                  key={item.id || `folder_${idx}`}
-                  folder={item}
-                  activeTabId={activeTabId}
-                  onSelectTab={handleSelectTab}
-                />
-              );
-            }
+          <>
+            {/* Pinned tabs */}
+            {pinnedTabs.map((item, idx) => renderItem(item, idx))}
 
-            if (item.node_type === "split_view") {
-              return (
-                <ZenSplitViewItem
-                  key={item.id || `split_${idx}`}
-                  node={item}
-                  onSelectTab={handleSelectTab}
-                />
-              );
-            }
+            {/* Separator below pinned tabs */}
+            {pinnedTabs.length > 0 && regularItems.length > 0 && (
+              <div className="my-2 border-b border-slate-200/80 dark:border-slate-800/80 mx-1.5" />
+            )}
 
-            return (
-              <ZenTabItem
-                key={item.id || `tab_${idx}`}
-                tab={item}
-                isPinned={item.node_type === "pinned_tab"}
-                isActive={activeTabId === item.id}
-                onSelect={handleSelectTab}
-              />
-            );
-          })
+            {/* Regular items */}
+            {regularItems.map((item, idx) => renderItem(item, idx + pinnedTabs.length))}
+          </>
         )}
-      </div>
-
-      {/* 4. Divider & "+ New Tab" */}
-      <div className="w-full pt-2 mt-2 border-t border-slate-200/70 dark:border-slate-800">
-        <div className="flex items-center gap-2.5 px-3 py-2 text-slate-500/80 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/40 dark:hover:bg-slate-800/40 rounded-2xl cursor-pointer transition-all">
-          <Plus className="w-4 h-4" />
-          <span className="text-sm font-semibold">New Tab</span>
-        </div>
       </div>
     </div>
   );
