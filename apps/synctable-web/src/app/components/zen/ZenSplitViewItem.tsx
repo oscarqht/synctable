@@ -9,12 +9,14 @@ import { getDomain, getFaviconUrl } from "./ZenTabItem";
 interface ZenSplitViewItemProps {
   node: BrowserTreeNode;
   isCompact?: boolean;
+  isDarkTheme?: boolean;
   onSelectTab?: (tab: BrowserTreeNode) => void;
 }
 
 export function ZenSplitViewItem({
   node,
   isCompact = false,
+  isDarkTheme = false,
   onSelectTab,
 }: ZenSplitViewItemProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -37,7 +39,11 @@ export function ZenSplitViewItem({
     return (
       <div
         title={`Split View: ${children.map((c) => c.title || getDomain(c.url)).join(" | ")}`}
-        className="w-9 h-9 rounded-xl border border-cyan-400/40 bg-cyan-500/10 flex items-center justify-center p-1 relative cursor-pointer hover:bg-cyan-500/20 transition-all shadow-xs"
+        className={`w-9 h-9 rounded-xl border flex items-center justify-center p-1 relative cursor-pointer transition-all shadow-xs ${
+          isDarkTheme
+            ? "border-white/30 bg-white/10 hover:bg-white/20"
+            : "border-cyan-400/40 bg-cyan-500/10 hover:bg-cyan-500/20"
+        }`}
       >
         <div className="grid grid-cols-2 gap-0.5 w-full h-full p-0.5 items-center justify-center">
           {children.slice(0, 2).map((tab, idx) => {
@@ -63,14 +69,22 @@ export function ZenSplitViewItem({
   }
 
   return (
-    <div className="my-1 p-1 rounded-xl border border-cyan-500/30 bg-cyan-500/5 hover:border-cyan-500/50 hover:bg-cyan-500/10 transition-all select-none">
+    <div className={`my-1 p-1 rounded-xl border transition-all select-none ${
+      isDarkTheme
+        ? "border-white/20 bg-white/10 hover:border-white/30 hover:bg-white/15"
+        : "border-cyan-500/30 bg-cyan-500/5 hover:border-cyan-500/50 hover:bg-cyan-500/10"
+    }`}>
       {/* Split View Header */}
-      <div className="flex items-center justify-between px-2 py-0.5 mb-1 text-[10px] text-cyan-700 dark:text-cyan-300 font-semibold tracking-wide uppercase">
+      <div className={`flex items-center justify-between px-2 py-0.5 mb-1 text-[10px] font-semibold tracking-wide uppercase ${
+        isDarkTheme ? "text-white" : "text-cyan-700 dark:text-cyan-300"
+      }`}>
         <div className="flex items-center gap-1.5">
-          <Columns className="w-3 h-3 text-cyan-600" />
+          <Columns className={`w-3 h-3 ${isDarkTheme ? "text-white" : "text-cyan-600"}`} />
           <span>{node.title || "Split View"}</span>
         </div>
-        <span className="text-[9px] font-bold bg-cyan-500/15 px-1.5 py-0.2 rounded text-cyan-800 dark:text-cyan-200">
+        <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+          isDarkTheme ? "bg-white/20 text-white" : "bg-cyan-500/15 text-cyan-800 dark:text-cyan-200"
+        }`}>
           {children.length} panes
         </span>
       </div>

@@ -28,9 +28,25 @@ export class SyncTableDB {
         url TEXT,
         parent_id VARCHAR(255),
         sort_order INT NOT NULL,
-        snapshot_time TIMESTAMP NOT NULL
+        snapshot_time TIMESTAMP NOT NULL,
+        theme_color TEXT,
+        theme_colors TEXT,
+        icon TEXT
       );
     `);
+
+    // Safely migrate existing tables if columns do not exist
+    const columns = this.db.query("PRAGMA table_info(browser_trees)").all() as { name: string }[];
+    const colNames = new Set(columns.map((c) => c.name));
+    if (!colNames.has("theme_color")) {
+      this.db.run("ALTER TABLE browser_trees ADD COLUMN theme_color TEXT");
+    }
+    if (!colNames.has("theme_colors")) {
+      this.db.run("ALTER TABLE browser_trees ADD COLUMN theme_colors TEXT");
+    }
+    if (!colNames.has("icon")) {
+      this.db.run("ALTER TABLE browser_trees ADD COLUMN icon TEXT");
+    }
 
     this.db.run(`
       CREATE INDEX IF NOT EXISTS idx_browser_parent 
@@ -146,16 +162,19 @@ export class SyncTableDB {
   public upsertNodes(nodes: BrowserTreeNode[]) {
     const upsertStmt = this.db.prepare(`
       INSERT INTO browser_trees (
-        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time
+        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time, theme_color, theme_colors, icon
       ) VALUES (
-        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time
+        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time, $theme_color, $theme_colors, $icon
       )
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         url = excluded.url,
         parent_id = excluded.parent_id,
         sort_order = excluded.sort_order,
-        snapshot_time = excluded.snapshot_time;
+        snapshot_time = excluded.snapshot_time,
+        theme_color = excluded.theme_color,
+        theme_colors = excluded.theme_colors,
+        icon = excluded.icon;
     `);
 
     const transaction = this.db.transaction((items: BrowserTreeNode[]) => {
@@ -171,6 +190,9 @@ export class SyncTableDB {
           $parent_id: item.parent_id,
           $sort_order: item.sort_order,
           $snapshot_time: item.snapshot_time,
+          $theme_color: item.theme_color ?? null,
+          $theme_colors: item.theme_colors ? JSON.stringify(item.theme_colors) : null,
+          $icon: item.icon ?? null,
         });
       }
     });
@@ -184,9 +206,9 @@ export class SyncTableDB {
     );
     const upsertStmt = this.db.prepare(`
       INSERT INTO browser_trees (
-        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time
+        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time, theme_color, theme_colors, icon
       ) VALUES (
-        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time
+        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time, $theme_color, $theme_colors, $icon
       )
     `);
 
@@ -204,6 +226,9 @@ export class SyncTableDB {
           $parent_id: item.parent_id,
           $sort_order: item.sort_order,
           $snapshot_time: item.snapshot_time,
+          $theme_color: item.theme_color ?? null,
+          $theme_colors: item.theme_colors ? JSON.stringify(item.theme_colors) : null,
+          $icon: item.icon ?? null,
         });
       }
     })(nodes);
@@ -215,9 +240,9 @@ export class SyncTableDB {
     );
     const insertStmt = this.db.prepare(`
       INSERT INTO browser_trees (
-        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time
+        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time, theme_color, theme_colors, icon
       ) VALUES (
-        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time
+        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time, $theme_color, $theme_colors, $icon
       )
     `);
 
@@ -235,6 +260,9 @@ export class SyncTableDB {
           $parent_id: item.parent_id,
           $sort_order: item.sort_order,
           $snapshot_time: item.snapshot_time,
+          $theme_color: item.theme_color ?? null,
+          $theme_colors: item.theme_colors ? JSON.stringify(item.theme_colors) : null,
+          $icon: item.icon ?? null,
         });
       }
     })(nodes);
@@ -260,7 +288,13 @@ export class SyncTableDB {
 
     query += " ORDER BY sort_order ASC, id ASC";
 
-    return this.db.query(query).all(params) as BrowserTreeNode[];
+    const rows = this.db.query(query).all(params) as any[];
+    return rows.map((row) => ({
+      ...row,
+      theme_colors: row.theme_colors
+        ? (typeof row.theme_colors === "string" ? JSON.parse(row.theme_colors) : row.theme_colors)
+        : null,
+    })) as BrowserTreeNode[];
   }
 
   public getTree(browserName?: string, profileName?: string): BrowserTreeNode[] {

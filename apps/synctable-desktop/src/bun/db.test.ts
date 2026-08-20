@@ -63,5 +63,37 @@ describe("SyncTableDB", () => {
     db.setLastUploadedTreeHash("def456hash");
     expect(db.getLastUploadedTreeHash()).toBe("def456hash");
   });
+
+  test("persists and retrieves theme_color, theme_colors, and icon", () => {
+    const db = new SyncTableDB(":memory:");
+    const spaceNode: BrowserTreeNode = {
+      id: "arc-space-work",
+      browser_name: "arc",
+      os_type: "macos",
+      profile_name: "Default",
+      node_type: "workspace",
+      title: "Work Space",
+      url: null,
+      parent_id: null,
+      sort_order: 0,
+      snapshot_time: "2026-08-20T00:00:00.000Z",
+      theme_color: "#8ef1cc",
+      theme_colors: ["#8ef1cc", "#95dff1", "#99f09e"],
+      icon: "🐻",
+    };
+
+    db.upsertNodes([spaceNode]);
+    const nodes = db.getAllNodes("arc", "Default");
+    expect(nodes).toHaveLength(1);
+    expect(nodes[0].theme_color).toBe("#8ef1cc");
+    expect(nodes[0].theme_colors).toEqual(["#8ef1cc", "#95dff1", "#99f09e"]);
+    expect(nodes[0].icon).toBe("🐻");
+
+    const tree = db.getTree("arc", "Default");
+    expect(tree).toHaveLength(1);
+    expect(tree[0].theme_color).toBe("#8ef1cc");
+    expect(tree[0].theme_colors).toEqual(["#8ef1cc", "#95dff1", "#99f09e"]);
+    expect(tree[0].icon).toBe("🐻");
+  });
 });
 

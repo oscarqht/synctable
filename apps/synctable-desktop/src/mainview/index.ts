@@ -105,6 +105,16 @@ function renderTree(nodes: BrowserTreeNode[], query = "") {
   });
 }
 
+function isDarkColor(hexColor: string): boolean {
+  if (!hexColor || !hexColor.startsWith("#")) return false;
+  const hex = hexColor.replace("#", "");
+  const r = parseInt(hex.substring(0, 2), 16) || 0;
+  const g = parseInt(hex.substring(2, 4), 16) || 0;
+  const b = parseInt(hex.substring(4, 6), 16) || 0;
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq < 128;
+}
+
 function createTreeNodeElement(node: BrowserTreeNode, query: string): HTMLElement | null {
   const matches = !query || (node.title && node.title.toLowerCase().includes(query.toLowerCase())) || (node.url && node.url.toLowerCase().includes(query.toLowerCase()));
 
@@ -116,6 +126,22 @@ function createTreeNodeElement(node: BrowserTreeNode, query: string): HTMLElemen
   const container = document.createElement("div");
   container.className = "tree-node";
 
+  if (node.node_type === "workspace") {
+    if (node.theme_colors && node.theme_colors.length > 1) {
+      container.style.background = `linear-gradient(135deg, ${node.theme_colors.join(", ")})`;
+      container.classList.add("theme-bg-workspace");
+      if (isDarkColor(node.theme_colors[0])) {
+        container.classList.add("theme-dark");
+      }
+    } else if (node.theme_color) {
+      container.style.background = node.theme_color;
+      container.classList.add("theme-bg-workspace");
+      if (isDarkColor(node.theme_color)) {
+        container.classList.add("theme-dark");
+      }
+    }
+  }
+
   const header = document.createElement("div");
   header.className = "node-header";
 
@@ -123,11 +149,16 @@ function createTreeNodeElement(node: BrowserTreeNode, query: string): HTMLElemen
   tag.className = `node-type-tag tag-${node.node_type}`;
   tag.textContent = node.node_type.replace("_", " ");
 
+  header.appendChild(tag);
+
   const title = document.createElement("span");
   title.className = "node-title";
-  title.textContent = node.title || "(Untitled)";
+  if (node.icon) {
+    title.textContent = `${node.icon} ${node.title || "(Untitled)"}`;
+  } else {
+    title.textContent = node.title || "(Untitled)";
+  }
 
-  header.appendChild(tag);
   header.appendChild(title);
 
   if (node.url) {

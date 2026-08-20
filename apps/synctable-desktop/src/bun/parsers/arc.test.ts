@@ -38,3 +38,114 @@ test("imports Arc's alternating sidebar records, folders, split views, and pinne
   expect(nodes.filter((node) => node.node_type === "tab").map((node) => node.url)).toEqual(["https://favorite.example", "https://article.example", "https://left.example", "https://right.example"]);
   expect(nodes.filter((node) => node.parent_id === "arc-space-space-work").map((node) => node.title)).toEqual(["Pinned", "Reading", "Split View"]);
 });
+
+test("extracts Arc space theme colors and emoji icons for single colors and blended gradients", () => {
+  const directory = mkdtempSync(join(tmpdir(), "synctable-arc-theme-"));
+  const filePath = join(directory, "StorableSidebar.json");
+  writeFileSync(
+    filePath,
+    JSON.stringify({
+      sidebar: {
+        containers: [
+          {
+            spaces: [
+              "space-gradient",
+              {
+                id: "space-gradient",
+                title: "Personal",
+                customInfo: {
+                  iconType: { emoji_v2: "🐻" },
+                  windowTheme: {
+                    background: {
+                      single: {
+                        _0: {
+                          style: {
+                            color: {
+                              _0: {
+                                blendedGradient: {
+                                  _0: {
+                                    baseColors: [
+                                      { red: 0.55798, green: 0.9438, blue: 0.80186, alpha: 1 },
+                                      { red: 0.58469, green: 0.87624, blue: 0.94357, alpha: 1 },
+                                    ],
+                                    overlayColors: [
+                                      { red: 0, green: 0, blue: 0, alpha: 0 },
+                                      { red: 0.60075, green: 0.94302, blue: 0.61872, alpha: 1 },
+                                    ],
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              "space-solid",
+              {
+                id: "space-solid",
+                title: "Work",
+                customInfo: {
+                  iconType: { emoji: 128188 },
+                  windowTheme: {
+                    background: {
+                      single: {
+                        _0: {
+                          style: {
+                            color: {
+                              _0: {
+                                blendedSingleColor: {
+                                  _0: {
+                                    color: { red: 0.2, green: 0.4, blue: 0.8, alpha: 1 },
+                                  },
+                                },
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+              "space-palette-fallback",
+              {
+                id: "space-palette-fallback",
+                title: "Fallback",
+                customInfo: {
+                  windowTheme: {
+                    primaryColorPalette: {
+                      midTone: { red: 0.9, green: 0.1, blue: 0.2, alpha: 1 },
+                    },
+                  },
+                },
+              },
+            ],
+            items: [],
+          },
+        ],
+      },
+    })
+  );
+
+  const nodes = parseArcSidebar({ filePath, osType: "macos", profileName: "Default", snapshotTime: "now" });
+  const personalSpace = nodes.find((n) => n.id === "arc-space-space-gradient");
+  expect(personalSpace).toBeDefined();
+  expect(personalSpace?.icon).toBe("🐻");
+  expect(personalSpace?.theme_color).toBe("#8ef1cc");
+  expect(personalSpace?.theme_colors).toEqual(["#8ef1cc", "#95dff1", "#99f09e"]);
+
+  const workSpace = nodes.find((n) => n.id === "arc-space-space-solid");
+  expect(workSpace).toBeDefined();
+  expect(workSpace?.icon).toBe("💼");
+  expect(workSpace?.theme_color).toBe("#3366cc");
+  expect(workSpace?.theme_colors).toEqual(["#3366cc"]);
+
+  const fallbackSpace = nodes.find((n) => n.id === "arc-space-space-palette-fallback");
+  expect(fallbackSpace).toBeDefined();
+  expect(fallbackSpace?.theme_color).toBe("#e61a33");
+  expect(fallbackSpace?.theme_colors).toEqual(["#e61a33"]);
+});
+

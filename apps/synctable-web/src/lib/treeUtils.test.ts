@@ -65,6 +65,9 @@ describe("treeUtils - workspace extraction", () => {
               parent_id: "arc-default-win-default",
               sort_order: 1,
               snapshot_time: "2026-08-20T10:00:00Z",
+              theme_color: "#8ef1cc",
+              theme_colors: ["#8ef1cc", "#95dff1", "#99f09e"],
+              icon: "🐻",
               children: [
                 {
                   id: "tab-2",
@@ -91,6 +94,8 @@ describe("treeUtils - workspace extraction", () => {
               parent_id: "arc-default-win-default",
               sort_order: 2,
               snapshot_time: "2026-08-20T10:00:00Z",
+              theme_color: "#ffffff",
+              theme_colors: ["#ffffff"],
               children: [
                 {
                   id: "tab-3",
@@ -117,8 +122,12 @@ describe("treeUtils - workspace extraction", () => {
     expect(workspaces[0].tabCount).toBe(1);
     expect(workspaces[1].workspaceTitle).toBe("Oscar");
     expect(workspaces[1].tabCount).toBe(1);
+    expect(workspaces[1].themeColor).toBe("#8ef1cc");
+    expect(workspaces[1].themeColors).toEqual(["#8ef1cc", "#95dff1", "#99f09e"]);
+    expect(workspaces[1].icon).toBe("🐻");
     expect(workspaces[2].workspaceTitle).toBe("Test");
     expect(workspaces[2].tabCount).toBe(1);
+    expect(workspaces[2].themeColor).toBe("#ffffff");
 
     expect(countWorkspaces(arcTree)).toBe(3);
     expect(countTabs(arcTree)).toBe(3);

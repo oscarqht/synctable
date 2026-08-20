@@ -71,6 +71,9 @@ export interface WorkspaceItem {
   profileName: string;
   windowTitle?: string;
   workspaceTitle: string;
+  themeColor?: string | null;
+  themeColors?: string[] | null;
+  icon?: string | null;
   node: BrowserTreeNode;
   tabCount: number;
 }
@@ -119,6 +122,9 @@ export function extractWorkspacesFromRoot(rawRootNode: BrowserTreeNode): Workspa
             profileName,
             windowTitle: win.title || undefined,
             workspaceTitle: wsTitle,
+            themeColor: ws.theme_color,
+            themeColors: ws.theme_colors,
+            icon: ws.icon,
             node: ws,
             tabCount: countTabs(ws),
           });
@@ -132,6 +138,9 @@ export function extractWorkspacesFromRoot(rawRootNode: BrowserTreeNode): Workspa
           profileName,
           windowTitle: win.title || undefined,
           workspaceTitle: win.title || "Main Window",
+          themeColor: win.theme_color,
+          themeColors: win.theme_colors,
+          icon: win.icon,
           node: {
             ...win,
             node_type: "workspace",
@@ -154,6 +163,9 @@ export function extractWorkspacesFromRoot(rawRootNode: BrowserTreeNode): Workspa
           browserTitle,
           profileName,
           workspaceTitle: ws.title || "Workspace",
+          themeColor: ws.theme_color,
+          themeColors: ws.theme_colors,
+          icon: ws.icon,
           node: ws,
           tabCount: countTabs(ws),
         });
@@ -166,6 +178,9 @@ export function extractWorkspacesFromRoot(rawRootNode: BrowserTreeNode): Workspa
         browserTitle,
         profileName,
         workspaceTitle: rootNode.title || "Personal",
+        themeColor: rootNode.theme_color,
+        themeColors: rootNode.theme_colors,
+        icon: rootNode.icon,
         node: {
           ...rootNode,
           node_type: "workspace",

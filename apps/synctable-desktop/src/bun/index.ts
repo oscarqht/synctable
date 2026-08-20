@@ -1,5 +1,5 @@
 import { ApplicationMenu, BrowserView, BrowserWindow, defineElectrobunRPC, Utils } from "electrobun/bun";
-import { existsSync } from "node:fs";
+import { existsSync, watch } from "node:fs";
 import { platform } from "node:os";
 import { join } from "node:path";
 import { SyncTableDB } from "./db";
@@ -142,7 +142,7 @@ void syncAndNotify();
 const SYNC_INTERVAL_MS = 1 * 60 * 1000;
 let autoSyncPaused = false;
 
-async function runAutoSync(reason: "periodic" | "resumed") {
+async function runAutoSync(reason: "periodic" | "resumed" | "file_change") {
   if (autoSyncPaused) {
     console.log("[SyncTable Daemon] Auto-sync paused while the session is inactive.");
     return;
@@ -199,7 +199,38 @@ function monitorMacLifecycle() {
   })().catch((err) => console.error("[SyncTable Daemon] Lifecycle monitor error:", err));
 }
 
+function monitorBrowserFileChanges() {
+  const profiles = syncManager.getBrowserProfiles();
+  const watchedPaths = new Set<string>();
+
+  let fileChangeTimer: Timer | undefined;
+  const triggerFileChangeSync = (browser: string, path: string) => {
+    clearTimeout(fileChangeTimer);
+    fileChangeTimer = setTimeout(() => {
+      console.log(`[SyncTable Daemon] Detected change in ${browser} (${path}), triggering sync...`);
+      runAutoSync("file_change");
+    }, 1000);
+  };
+
+  for (const prof of profiles) {
+    const pathsToWatch = [prof.sourcePath, prof.sessionPath].filter(Boolean) as string[];
+    for (const p of pathsToWatch) {
+      if (!watchedPaths.has(p) && existsSync(p)) {
+        watchedPaths.add(p);
+        try {
+          watch(p, () => {
+            triggerFileChangeSync(prof.browser, p);
+          });
+        } catch (err) {
+          console.warn(`[SyncTable Daemon] Could not watch ${p}:`, err);
+        }
+      }
+    }
+  }
+}
+
 monitorMacLifecycle();
+monitorBrowserFileChanges();
 
 setInterval(() => {
   runAutoSync("periodic");

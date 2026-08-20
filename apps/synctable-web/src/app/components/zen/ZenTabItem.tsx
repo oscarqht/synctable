@@ -10,6 +10,7 @@ interface ZenTabItemProps {
   isPinned?: boolean;
   isCompact?: boolean;
   isActive?: boolean;
+  isDarkTheme?: boolean;
   onSelect?: (tab: BrowserTreeNode) => void;
 }
 
@@ -38,6 +39,7 @@ export function ZenTabItem({
   isPinned = false,
   isCompact = false,
   isActive = false,
+  isDarkTheme = false,
   onSelect,
 }: ZenTabItemProps) {
   const [copied, setCopied] = useState(false);
@@ -67,6 +69,8 @@ export function ZenTabItem({
         className={`w-10 h-10 rounded-2xl flex items-center justify-center relative cursor-pointer group/tab transition-all duration-150 active:scale-95 ${
           isActive
             ? "bg-white dark:bg-slate-800 shadow-sm ring-2 ring-cyan-500/50"
+            : isDarkTheme
+            ? "hover:bg-white/20 text-white"
             : "hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300"
         }`}
       >
@@ -78,7 +82,7 @@ export function ZenTabItem({
             className="w-5 h-5 rounded object-contain shrink-0"
           />
         ) : (
-          <span className="w-5 h-5 rounded-lg bg-slate-200 dark:bg-slate-700 text-[11px] font-bold flex items-center justify-center uppercase">
+          <span className={`w-5 h-5 rounded-lg text-[11px] font-bold flex items-center justify-center uppercase ${isDarkTheme ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-700"}`}>
             {domain ? domain.charAt(0) : "T"}
           </span>
         )}
@@ -91,7 +95,9 @@ export function ZenTabItem({
       onClick={() => onSelect?.(tab)}
       className={`group/tab relative flex items-center gap-3 px-3.5 py-2.5 rounded-2xl cursor-pointer transition-all duration-150 select-none ${
         isActive
-          ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm border border-slate-100 dark:border-slate-700/60 font-bold"
+          ? "bg-white text-slate-900 shadow-sm border border-slate-100 dark:border-slate-700/60 font-bold"
+          : isDarkTheme
+          ? "hover:bg-white/20 text-white font-medium"
           : "hover:bg-slate-200/50 dark:hover:bg-slate-800/50 text-slate-800 dark:text-slate-200 font-semibold"
       } active:scale-[0.99]`}
     >
@@ -114,7 +120,7 @@ export function ZenTabItem({
       {/* Tab Title */}
       <div className="flex-1 min-w-0 flex items-center">
         <span
-          className="text-sm truncate leading-tight tracking-tight"
+          className={`text-sm truncate leading-tight tracking-tight ${isDarkTheme && !isActive ? "text-white font-medium" : ""}`}
           title={tab.title || domain || "Tab"}
         >
           {tab.title || domain || "Untitled Tab"}
@@ -127,7 +133,11 @@ export function ZenTabItem({
           <button
             onClick={handleCopyUrl}
             title="Copy URL"
-            className="p-1 rounded-md text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
+            className={`p-1 rounded-md transition-all ${
+              isDarkTheme
+                ? "text-white/70 hover:text-white hover:bg-white/20"
+                : "text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+            }`}
           >
             {copied ? (
               <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -142,7 +152,11 @@ export function ZenTabItem({
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             title="Open URL in new window"
-            className="p-1 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all"
+            className={`p-1 rounded-md transition-all ${
+              isDarkTheme
+                ? "text-white/70 hover:text-white hover:bg-white/20"
+                : "text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+            }`}
           >
             <ExternalLink className="w-3.5 h-3.5" />
           </a>

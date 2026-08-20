@@ -13,6 +13,7 @@ interface ZenFolderItemProps {
   isCompact?: boolean;
   activeTabId?: string | null;
   defaultExpanded?: boolean;
+  isDarkTheme?: boolean;
   onSelectTab?: (tab: BrowserTreeNode) => void;
 }
 
@@ -22,6 +23,7 @@ export function ZenFolderItem({
   isCompact = false,
   activeTabId,
   defaultExpanded = true,
+  isDarkTheme = false,
   onSelectTab,
 }: ZenFolderItemProps) {
   const [isOpen, setIsOpen] = useState<boolean>(defaultExpanded);
@@ -40,7 +42,9 @@ export function ZenFolderItem({
       <div
         onClick={() => setIsOpen(!isOpen)}
         title={`Folder: ${folder.title || "Folder"} (${children.length} tabs)`}
-        className="w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer hover:bg-slate-200/60 dark:hover:bg-slate-800/60 relative transition-all"
+        className={`w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer relative transition-all ${
+          isDarkTheme ? "hover:bg-white/20 text-white" : "hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
+        }`}
       >
         <ZenFolderIcon isOpen={isOpen} size={22} />
       </div>
@@ -52,13 +56,19 @@ export function ZenFolderItem({
       {/* Folder Row */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl cursor-pointer hover:bg-slate-200/50 dark:hover:bg-slate-800/50 transition-all duration-150 active:scale-[0.99]"
+        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl cursor-pointer transition-all duration-150 active:scale-[0.99] ${
+          isDarkTheme
+            ? "hover:bg-white/15 text-white"
+            : "hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+        }`}
       >
         {/* Blue Outline Folder Icon */}
         <ZenFolderIcon isOpen={isOpen} size={22} />
 
         {/* Folder Title */}
-        <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate flex-1 leading-tight tracking-tight">
+        <span className={`text-sm font-bold truncate flex-1 leading-tight tracking-tight ${
+          isDarkTheme ? "text-white" : "text-slate-900 dark:text-slate-100"
+        }`}>
           {folder.title || "Folder"}
         </span>
       </div>
@@ -76,6 +86,7 @@ export function ZenFolderItem({
                   isCompact={isCompact}
                   activeTabId={activeTabId}
                   defaultExpanded={defaultExpanded}
+                  isDarkTheme={isDarkTheme}
                   onSelectTab={onSelectTab}
                 />
               );
@@ -86,6 +97,7 @@ export function ZenFolderItem({
                   key={child.id || `split_${idx}`}
                   node={child}
                   isCompact={isCompact}
+                  isDarkTheme={isDarkTheme}
                   onSelectTab={onSelectTab}
                 />
               );
@@ -97,6 +109,7 @@ export function ZenFolderItem({
                 isPinned={child.node_type === "pinned_tab"}
                 isCompact={isCompact}
                 isActive={activeTabId === child.id}
+                isDarkTheme={isDarkTheme}
                 onSelect={onSelectTab}
               />
             );

@@ -61,6 +61,190 @@ function topAppContainerIds(container: any): string[] {
   return values.filter((value: unknown): value is string => typeof value === "string");
 }
 
+function clamp255(val: unknown): number {
+  if (typeof val !== "number" || isNaN(val)) return 0;
+  // If val is > 1.5, assume it is an integer in 0..255 range; otherwise treat as 0..1 float
+  const normalized = val > 1.5 ? val : val * 255;
+  return Math.min(255, Math.max(0, Math.round(normalized)));
+}
+
+export function extractArcColor(colorObj: unknown): string | null {
+  if (!colorObj || typeof colorObj !== "object") return null;
+  const obj = colorObj as any;
+  if (typeof obj === "string" && obj.startsWith("#")) return obj;
+  if (typeof obj.hex === "string" && obj.hex.startsWith("#")) return obj.hex;
+  if (obj._0 && typeof obj._0 === "object") {
+    const from0 = extractArcColor(obj._0);
+    if (from0) return from0;
+  }
+  if (obj.color && typeof obj.color === "object") {
+    const fromColor = extractArcColor(obj.color);
+    if (fromColor) return fromColor;
+  }
+  const r = obj.red ?? obj.r;
+  const g = obj.green ?? obj.g;
+  const b = obj.blue ?? obj.b;
+  if (typeof r === "number" && typeof g === "number" && typeof b === "number") {
+    const hr = clamp255(r).toString(16).padStart(2, "0");
+    const hg = clamp255(g).toString(16).padStart(2, "0");
+    const hb = clamp255(b).toString(16).padStart(2, "0");
+    return `#${hr}${hg}${hb}`;
+  }
+  return null;
+}
+
+export function extractArcIcon(space: ArcItem): string | null {
+  const iconType = space.customInfo?.iconType ?? space.iconType ?? space.customInfo?.icon ?? space.icon;
+  if (!iconType) return null;
+  if (typeof iconType === "string") return iconType.trim() || null;
+  if (typeof iconType.emoji_v2 === "string" && iconType.emoji_v2.trim()) {
+    return iconType.emoji_v2.trim();
+  }
+  if (typeof iconType.emoji === "number") {
+    try {
+      return String.fromCodePoint(iconType.emoji);
+    } catch {
+      // ignore
+    }
+  } else if (typeof iconType.emoji === "string" && iconType.emoji.trim()) {
+    return iconType.emoji.trim();
+  }
+  if (typeof iconType.icon === "string" && iconType.icon.trim()) {
+    return iconType.icon.trim();
+  }
+  if (typeof iconType.sfSymbol === "string" && iconType.sfSymbol.trim()) {
+    return iconType.sfSymbol.trim();
+  }
+  return null;
+}
+
+function extractColorsFromTarget(target: any, colors: string[], maxColors = 6): void {
+  if (!target || typeof target !== "object" || colors.length >= maxColors) return;
+
+  // Direct color object
+  const directHex = extractArcColor(target);
+  if (directHex && (target.alpha === undefined || target.alpha > 0.01)) {
+    if (!colors.includes(directHex)) colors.push(directHex);
+    return;
+  }
+
+  // Base colors, overlay colors, colors, colorList arrays
+  const arrayProps = ["baseColors", "overlayColors", "colors", "colorList", "stops"];
+  for (const prop of arrayProps) {
+    if (Array.isArray(target[prop])) {
+      for (const item of target[prop]) {
+        if (item && (item.alpha === undefined || item.alpha > 0.01)) {
+          const hex = extractArcColor(item);
+          if (hex && !colors.includes(hex) && colors.length < maxColors) {
+            colors.push(hex);
+          }
+        }
+      }
+    }
+  }
+
+  if (colors.length > 0) return;
+
+  // Traverse nested known style/gradient/color wrappers
+  const priorityKeys = [
+    "single",
+    "_0",
+    "style",
+    "color",
+    "blendedGradient",
+    "blendedLinearGradient",
+    "blendedRadialGradient",
+    "blendedSingleColor",
+    "singleColor",
+    "gradient",
+    "linearGradient",
+    "radialGradient",
+  ];
+
+  for (const key of priorityKeys) {
+    if (target[key] && typeof target[key] === "object") {
+      extractColorsFromTarget(target[key], colors, maxColors);
+      if (colors.length > 0) return;
+    }
+  }
+
+  // Generic fallback traversal for any remaining sub-objects
+  for (const [key, val] of Object.entries(target)) {
+    if (
+      !priorityKeys.includes(key) &&
+      !arrayProps.includes(key) &&
+      val &&
+      typeof val === "object" &&
+      key !== "primaryColorPalette" &&
+      key !== "semanticColorPalette" &&
+      key !== "modifiers" &&
+      key !== "wheel"
+    ) {
+      extractColorsFromTarget(val, colors, maxColors);
+      if (colors.length > 0) return;
+    }
+  }
+}
+
+export function extractArcSpaceTheme(space: ArcItem): {
+  theme_color: string | null;
+  theme_colors: string[] | null;
+  icon: string | null;
+} {
+  const colors: string[] = [];
+
+  const windowTheme = space.customInfo?.windowTheme ?? space.windowTheme ?? space.theme ?? space.customInfo?.theme;
+  if (windowTheme && typeof windowTheme === "object") {
+    // 1. Background style / gradient / colors
+    if (windowTheme.background) {
+      extractColorsFromTarget(windowTheme.background, colors);
+    }
+    if (colors.length === 0 && (windowTheme.gradient || windowTheme.color || windowTheme.style)) {
+      extractColorsFromTarget(windowTheme, colors);
+    }
+
+    // 2. Primary Color Palette fallback
+    if (colors.length === 0 && windowTheme.primaryColorPalette) {
+      const p = windowTheme.primaryColorPalette;
+      const palette = [p.midTone, p.shaded, p.shadedDark, p.tintedLight];
+      for (const item of palette) {
+        const hex = extractArcColor(item);
+        if (hex && !colors.includes(hex)) colors.push(hex);
+      }
+    }
+
+    // 3. Semantic Color Palette fallback
+    if (colors.length === 0 && windowTheme.semanticColorPalette?.appearanceBased) {
+      const app = windowTheme.semanticColorPalette.appearanceBased;
+      const palette = app.light || app.dark;
+      if (palette) {
+        const hex1 = extractArcColor(palette.background);
+        if (hex1 && !colors.includes(hex1)) colors.push(hex1);
+        const hex2 = extractArcColor(palette.foregroundPrimary);
+        if (hex2 && !colors.includes(hex2)) colors.push(hex2);
+      }
+    }
+  }
+
+  // 4. Fallback direct color fields
+  if (colors.length === 0) {
+    if (space.customInfo?.color) {
+      const h = extractArcColor(space.customInfo.color);
+      if (h && !colors.includes(h)) colors.push(h);
+    }
+    if (space.color) {
+      const h = extractArcColor(space.color);
+      if (h && !colors.includes(h)) colors.push(h);
+    }
+  }
+
+  const icon = extractArcIcon(space);
+  const theme_color = colors.length > 0 ? colors[0] : null;
+  const theme_colors = colors.length > 0 ? colors : null;
+
+  return { theme_color, theme_colors, icon };
+}
+
 export function parseArcSidebar(options: ArcParserOptions): BrowserTreeNode[] {
   const { filePath, osType, profileName, snapshotTime } = options;
   if (!existsSync(filePath)) return [];
@@ -93,7 +277,18 @@ export function parseArcSidebar(options: ArcParserOptions): BrowserTreeNode[] {
     }
     for (const [spaceKey, space] of spaces) {
       const workspaceId = `arc-space-${arcId(space.id ?? spaceKey, `space-${workspaceIndex}`)}`;
-      addNode({ id: workspaceId, node_type: "workspace", title: space.title || `Space ${workspaceIndex + 1}`, url: null, parent_id: windowId, sort_order: workspaceIndex++ });
+      const { theme_color, theme_colors, icon } = extractArcSpaceTheme(space);
+      addNode({
+        id: workspaceId,
+        node_type: "workspace",
+        title: space.title || `Space ${workspaceIndex + 1}`,
+        url: null,
+        parent_id: windowId,
+        sort_order: workspaceIndex++,
+        theme_color,
+        theme_colors,
+        icon,
+      });
       const visited = new Set<string>();
       const walk = (itemId: string, parentId: string, sortOrder: number, pinned: boolean): void => {
         if (visited.has(itemId)) return;

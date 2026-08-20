@@ -18,6 +18,9 @@ export function canonicalizeTree(nodes: BrowserTreeNode[]): any {
     url: node.url,
     parent_id: node.parent_id,
     sort_order: node.sort_order,
+    theme_color: node.theme_color ?? null,
+    theme_colors: node.theme_colors ?? null,
+    icon: node.icon ?? null,
     children: node.children ? canonicalizeTree(node.children) : [],
   }));
 }

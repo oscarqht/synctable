@@ -143,6 +143,16 @@ function hasMatchRecursive(node: BrowserTreeNode, query: string): boolean {
   return false;
 }
 
+function isDarkColor(hexColor?: string | null): boolean {
+  if (!hexColor || !hexColor.startsWith("#")) return false;
+  const hex = hexColor.replace("#", "");
+  const r = parseInt(hex.substring(0, 2), 16) || 0;
+  const g = parseInt(hex.substring(2, 4), 16) || 0;
+  const b = parseInt(hex.substring(4, 6), 16) || 0;
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq < 140;
+}
+
 export function TreeNodeItem({
   node,
   searchQuery = "",
@@ -224,26 +234,49 @@ export function TreeNodeItem({
   const isWorkspace = node.node_type === "workspace";
   const isPinned = node.node_type === "pinned_tab";
 
+  const isDark = Boolean(
+    isWorkspace &&
+      ((node.theme_colors && node.theme_colors.length > 0 && isDarkColor(node.theme_colors[0])) ||
+        (node.theme_color && isDarkColor(node.theme_color)))
+  );
+
+  const workspaceBgStyle: React.CSSProperties | undefined = isWorkspace
+    ? node.theme_colors && node.theme_colors.length > 1
+      ? { background: `linear-gradient(135deg, ${node.theme_colors.join(", ")})` }
+      : node.theme_color
+      ? { background: node.theme_color }
+      : undefined
+    : undefined;
+
   return (
     <div className="flex flex-col select-none group/node">
       {/* Node Row */}
       <div
         onClick={() => hasChildren && setExpanded(!expanded)}
+        style={{
+          paddingLeft: `${Math.max(depth * 16 + 8, 8)}px`,
+          ...workspaceBgStyle,
+        }}
         className={`flex items-center gap-2 py-1.5 px-2.5 rounded-xl transition-all duration-150 active:scale-[0.99] ${
           hasChildren ? "cursor-pointer" : "cursor-default"
         } ${
           isRoot
             ? "bg-slate-100/90 dark:bg-slate-800/90 hover:bg-slate-200/70 border border-slate-200/90 dark:border-slate-700/90 my-1 shadow-xs font-semibold"
             : isWorkspace
-            ? "bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/60 dark:hover:bg-purple-900/30 border border-purple-200/60 dark:border-purple-800/60 my-0.5"
+            ? workspaceBgStyle
+              ? isDark
+                ? "border border-white/20 text-white shadow-xs my-0.5"
+                : "border border-black/10 text-slate-900 shadow-xs my-0.5"
+              : "bg-purple-50/50 dark:bg-purple-950/20 hover:bg-purple-100/60 dark:hover:bg-purple-900/30 border border-purple-200/60 dark:border-purple-800/60 my-0.5"
             : isFolder
             ? "hover:bg-amber-50/50 dark:hover:bg-amber-950/20 border border-transparent hover:border-amber-200/50"
             : "hover:bg-slate-100/70 dark:hover:bg-slate-800/60 border border-transparent hover:border-slate-200/60"
         }`}
-        style={{ paddingLeft: `${Math.max(depth * 16 + 8, 8)}px` }}
       >
         {/* Expand / Collapse Chevron */}
-        <div className="w-4 h-4 flex items-center justify-center shrink-0 text-slate-400 group-hover/node:text-slate-600 dark:group-hover/node:text-slate-200 transition-colors">
+        <div className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${
+          isDark ? "text-white/70 group-hover/node:text-white" : "text-slate-400 group-hover/node:text-slate-600 dark:group-hover/node:text-slate-200"
+        }`}>
           {hasChildren ? (
             expanded ? (
               <ChevronDown className="w-3.5 h-3.5" />
@@ -251,7 +284,7 @@ export function TreeNodeItem({
               <ChevronRight className="w-3.5 h-3.5" />
             )
           ) : (
-            <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-600 ml-1" />
+            <span className={`w-1 h-1 rounded-full ml-1 ${isDark ? "bg-white/40" : "bg-slate-300 dark:bg-slate-600"}`} />
           )}
         </div>
 
@@ -279,12 +312,14 @@ export function TreeNodeItem({
           </div>
         ) : isWorkspace ? (
           <div className="flex items-center gap-1.5 shrink-0">
-            <div className="w-4 h-4 rounded-md bg-purple-600 text-white flex items-center justify-center shadow-xs">
-              <Layers className="w-2.5 h-2.5" />
-            </div>
-            <span className="text-[10px] font-bold text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/60 px-1.5 py-0.2 rounded border border-purple-200 dark:border-purple-800">
+            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded border ${
+              isDark
+                ? "text-white bg-white/20 border-white/30"
+                : "text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-950/60 border-purple-200 dark:border-purple-800"
+            }`}>
               Space
             </span>
+            {node.icon && <span className="text-xs">{node.icon}</span>}
           </div>
         ) : (
           <div className="flex items-center gap-1 shrink-0">
@@ -310,7 +345,11 @@ export function TreeNodeItem({
             className={`text-xs truncate ${
               isRoot
                 ? "text-slate-900 dark:text-white font-semibold"
-                : isWorkspace || isFolder
+                : isWorkspace
+                ? isDark
+                  ? "text-white font-semibold"
+                  : "text-slate-900 dark:text-slate-100 font-semibold"
+                : isFolder
                 ? "text-slate-900 dark:text-slate-100 font-semibold"
                 : "text-slate-700 dark:text-slate-300 font-normal"
             }`}
