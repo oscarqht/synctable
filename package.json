@@ -4,8 +4,10 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "packages/*"
   ],
+
   "scripts": {
     "dev:desktop": "bun --filter synctable-desktop dev",
     "dev:web": "bun --filter synctable-web dev",

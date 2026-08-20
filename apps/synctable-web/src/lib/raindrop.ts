@@ -293,40 +293,64 @@ export async function fetchRaindropFileContent(
   item: RaindropItem
 ): Promise<any | null> {
   const primaryApiUrl = `${RAINDROP_API_BASE}/raindrop/${item._id}/file`;
-  const candidates = [primaryApiUrl, item.link].filter(Boolean) as string[];
 
-  for (const candidateUrl of candidates) {
-    try {
-      const res = await fetch(candidateUrl, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "User-Agent": "SyncTable-Web/1.0",
-        },
-        redirect: "follow",
-        cache: "no-store",
-      });
+  // 1. Try primary endpoint with manual redirect so Authorization header isn't forwarded to S3
+  try {
+    const res = await fetch(primaryApiUrl, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "User-Agent": "SyncTable-Web/1.0",
+      },
+      redirect: "manual",
+      cache: "no-store",
+    });
 
-      if (res.ok) {
-        const text = await res.text();
-        if (text && text.trim()) {
-          try {
+    if (res.status === 301 || res.status === 302 || res.status === 307 || res.status === 308) {
+      const redirectUrl = res.headers.get("location");
+      if (redirectUrl) {
+        const fileRes = await fetch(redirectUrl, {
+          method: "GET",
+          cache: "no-store",
+        });
+        if (fileRes.ok) {
+          const text = await fileRes.text();
+          if (text && text.trim()) {
             return JSON.parse(text);
-          } catch {
-            // Not valid JSON, continue to next candidate
           }
         }
       }
+    } else if (res.ok) {
+      const text = await res.text();
+      if (text && text.trim()) {
+        return JSON.parse(text);
+      }
+    }
+  } catch (err) {
+    console.warn(`[Raindrop] Error fetching from ${primaryApiUrl}:`, err);
+  }
+
+  // 2. Fallback: try item.link without Authorization header
+  if (item.link) {
+    try {
+      const res = await fetch(item.link, {
+        method: "GET",
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const text = await res.text();
+        if (text && text.trim()) {
+          return JSON.parse(text);
+        }
+      }
     } catch (err) {
-      console.warn(`[Raindrop] Error fetching from ${candidateUrl}:`, err);
+      console.warn(`[Raindrop] Error fetching from item.link ${item.link}:`, err);
     }
   }
 
-  console.warn(
-    `[Raindrop] Could not retrieve valid JSON file content for item ${item._id}`
-  );
   return null;
 }
+
 
 
 

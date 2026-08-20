@@ -108,7 +108,9 @@ function ensureTreeHierarchy(nodes: any[]): BrowserTreeNode[] {
 }
 
 export async function GET(request: NextRequest) {
-  const token = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
+  const authHeader = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  const queryToken = request.nextUrl.searchParams.get("token");
+  const token = authHeader || queryToken || request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
 
   if (!token) {
     return NextResponse.json(
@@ -116,11 +118,12 @@ export async function GET(request: NextRequest) {
         authenticated: false,
         collection: null,
         devices: [],
-        error: "Not authenticated with Raindrop",
+        error: "Not authenticated with Raindrop. Please configure an API token or sign in.",
       } satisfies SynctableSyncResponse,
       { status: 401 }
     );
   }
+
 
   try {
     // 1. Find root collection "Synctable"

@@ -219,5 +219,124 @@ describe("RaindropClient", () => {
     expect(result.raindropId).toBe(999);
     expect(urlsCalled).toContain("PUT https://api.raindrop.io/rest/v1/raindrop/999");
   });
+
+  test("fetchUserProfile returns profile info", async () => {
+    const fakeFetch = mock(async (url: string | URL | Request) => {
+      expect(url.toString()).toBe("https://api.raindrop.io/rest/v1/user");
+      return new Response(
+        JSON.stringify({
+          result: true,
+          user: {
+            _id: 12345,
+            fullName: "Alice Developer",
+            email: "alice@example.com",
+            pro: true,
+            avatar: "https://example.com/avatar.png",
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      );
+    });
+
+    globalThis.fetch = fakeFetch as any;
+
+    const client = new RaindropClient();
+    const profile = await client.fetchUserProfile("test-token");
+
+    expect(profile).toEqual({
+      id: 12345,
+      name: "Alice Developer",
+      email: "alice@example.com",
+      avatarUrl: "https://example.com/avatar.png",
+      isPro: true,
+    });
+  });
+
+  test("fetchCloudDevices returns parsed device trees and stats", async () => {
+    const fakeFetch = mock(async (url: string | URL | Request) => {
+      const urlStr = url.toString();
+      if (urlStr.endsWith("/user")) {
+        return new Response(
+          JSON.stringify({
+            result: true,
+            user: { _id: 1, fullName: "Bob", email: "bob@example.com", pro: false },
+          }),
+          { status: 200 }
+        );
+      }
+      if (urlStr.endsWith("/collections")) {
+        return new Response(
+          JSON.stringify({
+            result: true,
+            items: [{ _id: 888, title: "Synctable", count: 1 }],
+          }),
+          { status: 200 }
+        );
+      }
+      if (urlStr.includes("/raindrops/888")) {
+        return new Response(
+          JSON.stringify({
+            result: true,
+            items: [
+              {
+                _id: 9991,
+                title: "macbook-air.txt",
+                excerpt: "MacBook Air M2",
+                lastUpdate: "2026-08-20T10:00:00.000Z",
+                file: { name: "macbook-air.txt", size: 1024 },
+              },
+            ],
+          }),
+          { status: 200 }
+        );
+      }
+      if (urlStr.includes("/raindrop/9991/file")) {
+        const dummyDeviceTree: BrowserTreeNode[] = [
+          {
+            id: "root-chrome",
+            browser_name: "chrome",
+            os_type: "macos",
+            profile_name: "Default",
+            node_type: "root",
+            title: "Google Chrome",
+            url: null,
+            parent_id: null,
+            sort_order: 0,
+            snapshot_time: "2026-08-20T10:00:00.000Z",
+            children: [
+              {
+                id: "tab-1",
+                browser_name: "chrome",
+                os_type: "macos",
+                profile_name: "Default",
+                node_type: "tab",
+                title: "GitHub",
+                url: "https://github.com",
+                parent_id: "root-chrome",
+                sort_order: 0,
+                snapshot_time: "2026-08-20T10:00:00.000Z",
+              },
+            ],
+          },
+        ];
+        return new Response(JSON.stringify(dummyDeviceTree), { status: 200 });
+      }
+      throw new Error(`Unexpected url: ${urlStr}`);
+    });
+
+    globalThis.fetch = fakeFetch as any;
+
+    const client = new RaindropClient();
+    const result = await client.fetchCloudDevices("test-token");
+
+    expect(result.authenticated).toBe(true);
+    expect(result.user?.name).toBe("Bob");
+    expect(result.collection?.id).toBe(888);
+    expect(result.devices.length).toBe(1);
+    expect(result.devices[0].deviceName).toBe("MacBook Air M2");
+    expect(result.devices[0].stats.totalTabs).toBe(1);
+    expect(result.devices[0].stats.browsers).toContain("chrome");
+  });
 });
+
 

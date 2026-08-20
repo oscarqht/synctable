@@ -13,9 +13,10 @@ export default {
     },
     views: {
       mainview: {
-        entrypoint: "src/mainview/index.ts",
+        entrypoint: "src/mainview/index.tsx",
       },
     },
+
     copy: {
       "src/mainview/index.html": "views/mainview/index.html",
       "src/mainview/style.css": "views/mainview/style.css",

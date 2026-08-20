@@ -1,4 +1,10 @@
-import type { BrowserTreeNode } from "../shared/types";
+import type {
+  BrowserTreeNode,
+  CloudDeviceData,
+  CloudSyncResponse,
+  DeviceStats,
+  RaindropUserProfile,
+} from "../shared/types";
 
 export const RAINDROP_COLLECTION_NAME = "Synctable";
 export const RAINDROP_API_BASE = "https://api.raindrop.io/rest/v1";
@@ -13,6 +19,10 @@ export interface RaindropCollectionItem {
 export interface RaindropItem {
   _id: number;
   title: string;
+  excerpt?: string;
+  link?: string;
+  lastUpdate?: string;
+  created?: string;
   file?: {
     name?: string;
     type?: string;
@@ -20,11 +30,139 @@ export interface RaindropItem {
   };
 }
 
+export function calculateNodeStats(nodes: BrowserTreeNode[]): DeviceStats {
+  let totalNodes = 0;
+  let totalTabs = 0;
+  let totalWorkspaces = 0;
+  let totalFolders = 0;
+  let totalWindows = 0;
+  const browsersSet = new Set<string>();
+
+  function traverse(node: BrowserTreeNode) {
+    totalNodes++;
+    if (node.browser_name) {
+      browsersSet.add(node.browser_name.toLowerCase());
+    }
+
+    if (node.node_type === "tab" || node.node_type === "pinned_tab") {
+      totalTabs++;
+    } else if (node.node_type === "workspace") {
+      totalWorkspaces++;
+    } else if (node.node_type === "folder") {
+      totalFolders++;
+    } else if (node.node_type === "window") {
+      totalWindows++;
+    }
+
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        traverse(child);
+      }
+    }
+  }
+
+  for (const node of nodes) {
+    traverse(node);
+  }
+
+  return {
+    totalNodes,
+    totalTabs,
+    totalWorkspaces,
+    totalFolders,
+    totalWindows,
+    browsers: Array.from(browsersSet),
+  };
+}
+
+export function ensureTreeHierarchy(nodes: any[]): BrowserTreeNode[] {
+  if (!Array.isArray(nodes) || nodes.length === 0) {
+    return [];
+  }
+
+  const hasChildrenField = nodes.some(
+    (n) => n.children && Array.isArray(n.children) && n.children.length > 0
+  );
+  if (hasChildrenField) {
+    return nodes as BrowserTreeNode[];
+  }
+
+  const nodeMap = new Map<string, BrowserTreeNode>();
+  const rootNodes: BrowserTreeNode[] = [];
+
+  for (const node of nodes) {
+    if (node && node.id) {
+      nodeMap.set(String(node.id), { ...node, children: [] });
+    }
+  }
+
+  for (const node of nodes) {
+    if (!node || !node.id) continue;
+    const current = nodeMap.get(String(node.id))!;
+    if (node.parent_id && nodeMap.has(String(node.parent_id))) {
+      const parent = nodeMap.get(String(node.parent_id))!;
+      parent.children = parent.children || [];
+      parent.children.push(current);
+    } else {
+      rootNodes.push(current);
+    }
+  }
+
+  return rootNodes.length > 0 ? rootNodes : (nodes as BrowserTreeNode[]);
+}
+
 export class RaindropClient {
   private apiBase: string;
 
   constructor(apiBase: string = RAINDROP_API_BASE) {
     this.apiBase = apiBase;
+  }
+
+  /**
+   * Fetch current user profile from Raindrop API
+   */
+  public async fetchUserProfile(token: string): Promise<RaindropUserProfile | null> {
+    try {
+      const res = await fetch(`${this.apiBase}/user`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (!res.ok) return null;
+
+      const data = (await res.json()) as {
+        result?: boolean;
+        user?: {
+          _id: number;
+          fullName?: string;
+          email?: string;
+          email_MD5?: string;
+          avatar?: string;
+          pro?: boolean;
+        };
+      };
+
+      if (!data.user) return null;
+
+      const user = data.user;
+      const avatarUrl = user.email_MD5
+        ? `https://www.gravatar.com/avatar/${user.email_MD5}?d=mp`
+        : user.avatar;
+
+      return {
+        id: user._id,
+        name: user.fullName || "Raindrop User",
+        email: user.email,
+        avatarUrl,
+        isPro: Boolean(user.pro),
+      };
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -37,6 +175,7 @@ export class RaindropClient {
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      signal: AbortSignal.timeout(6000),
     });
 
     if (!res.ok) {
@@ -65,6 +204,7 @@ export class RaindropClient {
         title: RAINDROP_COLLECTION_NAME,
         view: "list",
       }),
+      signal: AbortSignal.timeout(6000),
     });
 
     if (!createRes.ok) {
@@ -81,6 +221,168 @@ export class RaindropClient {
   }
 
   /**
+   * Find the collection named "Synctable" without creating it.
+   */
+  public async findSynctableCollection(token: string): Promise<RaindropCollectionItem | null> {
+    const res = await fetch(`${this.apiBase}/collections`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      signal: AbortSignal.timeout(6000),
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => "");
+      throw new Error(`Failed to list Raindrop collections (${res.status}): ${errorText}`);
+    }
+
+    const data = (await res.json()) as { result?: boolean; items?: RaindropCollectionItem[] };
+    const collections = data.items || [];
+    const synctableCol = collections.find(
+      (c) => c.title?.trim().toLowerCase() === RAINDROP_COLLECTION_NAME.toLowerCase()
+    );
+
+    if (synctableCol) return synctableCol;
+
+    try {
+      const childRes = await fetch(`${this.apiBase}/collections/childrens`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        signal: AbortSignal.timeout(6000),
+      });
+      if (childRes.ok) {
+        const childData = (await childRes.json()) as { result?: boolean; items?: RaindropCollectionItem[] };
+        const childCol = childData.items?.find(
+          (c) => c.title?.trim().toLowerCase() === RAINDROP_COLLECTION_NAME.toLowerCase()
+        );
+        if (childCol) return childCol;
+      }
+    } catch {
+      // ignore
+    }
+
+    return null;
+  }
+
+  /**
+   * Fetch all Raindrop items under the specified collection ID.
+   */
+  public async fetchCollectionRaindrops(
+    token: string,
+    collectionId: number
+  ): Promise<RaindropItem[]> {
+    const allItems: RaindropItem[] = [];
+    let page = 0;
+    const perpage = 50;
+
+    while (true) {
+      const res = await fetch(
+        `${this.apiBase}/raindrops/${collectionId}?perpage=${perpage}&page=${page}&sort=-lastUpdate`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: AbortSignal.timeout(6000),
+        }
+      );
+
+      if (!res.ok) {
+        const errorText = await res.text().catch(() => "");
+        throw new Error(
+          `Failed to fetch raindrops in collection ${collectionId} (${res.status}): ${errorText}`
+        );
+      }
+
+      const data = (await res.json()) as {
+        result?: boolean;
+        items?: RaindropItem[];
+        count?: number;
+      };
+
+      const items = data.items || [];
+      allItems.push(...items);
+
+      if (items.length < perpage) {
+        break;
+      }
+      page++;
+      if (page > 10) break;
+    }
+
+    return allItems;
+  }
+
+  /**
+   * Fetch file content of a Raindrop item with AWS S3 redirect protection.
+   */
+  public async fetchRaindropFileContent(
+    token: string,
+    item: RaindropItem
+  ): Promise<any | null> {
+    const primaryApiUrl = `${this.apiBase}/raindrop/${item._id}/file`;
+
+    // 1. Try primary endpoint with manual redirect so Authorization header isn't forwarded to S3
+    try {
+      const res = await fetch(primaryApiUrl, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "User-Agent": "SyncTable/1.0",
+        },
+        redirect: "manual",
+        signal: AbortSignal.timeout(6000),
+      });
+
+      if (res.status === 301 || res.status === 302 || res.status === 307 || res.status === 308) {
+        const redirectUrl = res.headers.get("location");
+        if (redirectUrl) {
+          const fileRes = await fetch(redirectUrl, {
+            method: "GET",
+            signal: AbortSignal.timeout(6000),
+          });
+          if (fileRes.ok) {
+            const text = await fileRes.text();
+            if (text && text.trim()) {
+              return JSON.parse(text);
+            }
+          }
+        }
+      } else if (res.ok) {
+        const text = await res.text();
+        if (text && text.trim()) {
+          return JSON.parse(text);
+        }
+      }
+    } catch (err) {
+      console.warn(`[Raindrop] Error fetching from ${primaryApiUrl}:`, err);
+    }
+
+    // 2. Fallback: try item.link without Authorization header
+    if (item.link) {
+      try {
+        const res = await fetch(item.link, {
+          method: "GET",
+          signal: AbortSignal.timeout(6000),
+        });
+        if (res.ok) {
+          const text = await res.text();
+          if (text && text.trim()) {
+            return JSON.parse(text);
+          }
+        }
+      } catch (err) {
+        console.warn(`[Raindrop] Error fetching from item.link ${item.link}:`, err);
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Search for existing raindrop items in the collection with the same device name/identifier,
    * and delete them.
    */
@@ -94,6 +396,7 @@ export class RaindropClient {
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      signal: AbortSignal.timeout(6000),
     });
 
     if (!res.ok) {
@@ -127,6 +430,7 @@ export class RaindropClient {
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        signal: AbortSignal.timeout(6000),
       });
 
       if (!deleteRes.ok) {
@@ -138,9 +442,6 @@ export class RaindropClient {
 
   /**
    * Upload the full tree as a JSON file to the collection.
-   * Content type is set to text/plain (raindrop doesn't support json file type),
-   * and collectionId is put before the file field in FormData.
-   * Returns the uploaded raindrop item ID if available.
    */
   public async uploadTreeFile(
     token: string,
@@ -152,7 +453,6 @@ export class RaindropClient {
     const blob = new Blob([jsonContent], { type: "text/plain" });
 
     const formData = new FormData();
-    // make sure collectionId is appended before file
     formData.append("collectionId", String(collectionId));
     formData.append("file", blob, `${deviceId}.txt`);
 
@@ -162,6 +462,7 @@ export class RaindropClient {
         Authorization: `Bearer ${token}`,
       },
       body: formData,
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {
@@ -188,6 +489,7 @@ export class RaindropClient {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ excerpt }),
+      signal: AbortSignal.timeout(6000),
     });
 
     if (!res.ok) {
@@ -195,6 +497,93 @@ export class RaindropClient {
       console.warn(`[Raindrop] Failed to update excerpt for item ${raindropId} (${res.status}): ${errorText}`);
     }
   }
+
+  /**
+   * Fetch all cloud devices and parse their browser trees from the Synctable collection.
+   */
+  public async fetchCloudDevices(token: string): Promise<CloudSyncResponse> {
+    if (!token || !token.trim()) {
+      return {
+        authenticated: false,
+        devices: [],
+        error: "Raindrop API token is not configured.",
+      };
+    }
+
+    try {
+      const [user, collection] = await Promise.all([
+        this.fetchUserProfile(token),
+        this.findSynctableCollection(token),
+      ]);
+
+      if (!collection) {
+        return {
+          authenticated: true,
+          user,
+          collection: null,
+          devices: [],
+        };
+      }
+
+      const items = await this.fetchCollectionRaindrops(token, collection._id);
+      const settledResults = await Promise.allSettled(
+        items.map(async (item): Promise<CloudDeviceData> => {
+          const rawContent = await this.fetchRaindropFileContent(token, item);
+          const tree = rawContent ? ensureTreeHierarchy(rawContent) : [];
+          const stats = calculateNodeStats(tree);
+
+          const rawFileName = item.file?.name || item.title || `device_${item._id}`;
+          const deviceId = rawFileName
+            .replace(/\.(txt|json)$/i, "")
+            .replace(/[^a-zA-Z0-9_-]/g, "_");
+
+          const deviceName =
+            item.excerpt?.trim() ||
+            item.title?.replace(/\.(txt|json)$/i, "") ||
+            `Device ${deviceId.slice(0, 8)}`;
+
+          return {
+            id: item._id,
+            deviceId,
+            deviceName,
+            fileName: rawFileName,
+            fileSize: item.file?.size,
+            lastUpdated: item.lastUpdate || item.created || new Date().toISOString(),
+            tree,
+            stats,
+          };
+        })
+      );
+
+      const deviceResults: CloudDeviceData[] = [];
+      for (const res of settledResults) {
+        if (res.status === "fulfilled") {
+          deviceResults.push(res.value);
+        }
+      }
+
+
+      return {
+        authenticated: true,
+        user,
+        collection: {
+          id: collection._id,
+          title: collection.title,
+          count: collection.count ?? items.length,
+        },
+        devices: deviceResults,
+      };
+    } catch (err: any) {
+      console.error("[RaindropClient] fetchCloudDevices error:", err);
+      return {
+        authenticated: true,
+        collection: null,
+        devices: [],
+        error: err?.message || "Failed to fetch device data from Raindrop",
+      };
+    }
+  }
+
 
   /**
    * Orchestrates the complete Raindrop sync flow:
@@ -220,3 +609,4 @@ export class RaindropClient {
 }
 
 export const defaultRaindropClient = new RaindropClient();
+

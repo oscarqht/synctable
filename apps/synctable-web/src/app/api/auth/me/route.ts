@@ -4,11 +4,13 @@ import { ACCESS_TOKEN_COOKIE, fetchRaindropUser } from "@/lib/raindrop";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const token = request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
+  const authHeader = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "");
+  const token = authHeader || request.cookies.get(ACCESS_TOKEN_COOKIE)?.value;
 
   if (!token) {
     return NextResponse.json({ user: null });
   }
+
 
   const user = await fetchRaindropUser(token);
 

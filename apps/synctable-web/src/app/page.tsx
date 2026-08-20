@@ -21,18 +21,22 @@ import {
   ChevronRight,
   ChevronDown,
   HardDrive,
-  Clock,
   X,
 } from "lucide-react";
-import type { RaindropUserProfile } from "@/lib/raindrop";
 import type {
-  DeviceTreeData,
+
+  RaindropUserProfile,
   SynctableSyncResponse,
   BrowserTreeNode,
-} from "@/lib/types";
-import { countTabs, countWorkspaces, pruneEmptyNodes, extractWorkspacesFromRoot } from "@/lib/treeUtils";
-import { TreeNodeItem } from "./components/TreeNodeItem";
-import { ZenSidebarView } from "./components/zen/ZenSidebarView";
+} from "@synctable/ui";
+import {
+  MultiDeviceCardsPortal,
+  countTabs,
+  countWorkspaces,
+  pruneEmptyNodes,
+} from "@synctable/ui";
+
+
 
 function formatRelativeTime(dateString: string): string {
   try {
@@ -76,8 +80,39 @@ export default function Home() {
   const [treeExpandedState, setTreeExpandedState] = useState<boolean>(true);
   const [viewMode, setViewMode] = useState<"zen_sidebar" | "tree">("zen_sidebar");
 
+  const [tokenInput, setTokenInput] = useState<string>("");
+  const [tokenLoading, setTokenLoading] = useState<boolean>(false);
+
+  const handleTokenLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = tokenInput.trim();
+    if (!token) return;
+
+    setTokenLoading(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch("/api/auth/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+
+      const data = await res.json();
+      if (res.ok && data.user) {
+        setUser(data.user);
+      } else {
+        setErrorMessage(data.error || "Failed to authenticate with token.");
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || "Failed to authenticate with token.");
+    } finally {
+      setTokenLoading(false);
+    }
+  };
+
   // Load User Auth
   useEffect(() => {
+
     const urlParams = new URLSearchParams(window.location.search);
     const error = urlParams.get("error");
     if (error) {
@@ -374,19 +409,65 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="p-6 sm:p-8 rounded-2xl bg-white border border-slate-200/90 shadow-xl shadow-slate-200/60 space-y-4">
+              <div className="p-6 sm:p-8 rounded-2xl bg-white border border-slate-200/90 shadow-xl shadow-slate-200/60 space-y-5">
                 <a
                   href="/api/auth/login"
                   className="w-full flex items-center justify-center space-x-2 py-3 px-6 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-medium text-sm shadow-md shadow-indigo-500/20 transition-all hover:scale-[1.01] active:scale-[0.99]"
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>Log in with Raindrop.io</span>
+                  <span>Log in with Raindrop.io (OAuth)</span>
                 </a>
-                <p className="text-xs text-slate-500">
-                  You will be securely redirected to Raindrop.io to authorize
-                  SyncTable.
-                </p>
+
+                <div className="relative flex items-center justify-center">
+                  <div className="border-t border-slate-200 w-full"></div>
+                  <span className="bg-white px-3 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Or connect with API token
+                  </span>
+                </div>
+
+                <form onSubmit={handleTokenLogin} className="space-y-3 text-left">
+                  <div>
+                    <label
+                      htmlFor="raindrop-api-token"
+                      className="block text-xs font-semibold text-slate-700 mb-1"
+                    >
+                      Raindrop.io Test Token
+                    </label>
+                    <input
+                      id="raindrop-api-token"
+                      type="password"
+                      value={tokenInput}
+                      onChange={(e) => setTokenInput(e.target.value)}
+                      placeholder="Paste your test token here"
+                      className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all text-slate-800"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={tokenLoading || !tokenInput.trim()}
+                    className="w-full flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-medium text-xs shadow-sm transition-all"
+                  >
+                    {tokenLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                    )}
+                    <span>Connect with API Token</span>
+                  </button>
+                  <p className="text-[11px] text-slate-500 text-center">
+                    Get your test token from{" "}
+                    <a
+                      href="https://app.raindrop.io/settings/integrations"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-cyan-600 hover:underline"
+                    >
+                      Raindrop.io Settings → Integrations
+                    </a>
+                  </p>
+                </form>
               </div>
+
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left pt-2">
                 <div className="p-3.5 rounded-xl bg-white border border-slate-200/80 shadow-xs flex flex-col space-y-1.5">
@@ -428,325 +509,16 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          /* AFTER LOGIN: Multi-Device Browser Tree Viewer */
+          /* AFTER LOGIN: Multi-Device Browser Tree Viewer using shared MultiDeviceCardsPortal */
           <div className="flex-1 flex flex-col space-y-6">
-
-            {/* Syncing / Loading Overlay */}
-            {syncLoading && !syncData ? (
-              <div className="py-20 flex flex-col items-center justify-center space-y-4 bg-white rounded-2xl border border-slate-200/80">
-                <Loader2 className="w-8 h-8 animate-spin text-cyan-600" />
-                <div className="text-center space-y-1">
-                  <p className="text-sm font-semibold text-slate-800">
-                    Locating Synctable collection & downloading tree snapshots...
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    Querying Raindrop.io REST API and parsing JSON files
-                  </p>
-                </div>
-              </div>
-            ) : !syncData?.collection ? (
-              /* No Synctable Collection Found State */
-              <div className="py-16 px-6 bg-white rounded-2xl border border-slate-200/80 text-center max-w-2xl mx-auto space-y-6 shadow-xs">
-                <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 mx-auto">
-                  <AlertCircle className="w-7 h-7" />
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-lg font-bold text-slate-900">
-                    No &quot;Synctable&quot; Collection Found in Raindrop
-                  </h3>
-                  <p className="text-sm text-slate-600 max-w-lg mx-auto">
-                    We could not find a collection named <strong>Synctable</strong> in
-                    your Raindrop account. Follow these quick steps to upload
-                    your first snapshot:
-                  </p>
-                </div>
-
-                {/* Instruction Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
-                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
-                      STEP 1
-                    </span>
-                    <h4 className="text-xs font-semibold text-slate-800 pt-1">
-                      Open Desktop App
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      Launch SyncTable on macOS/Windows/Linux.
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
-                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
-                      STEP 2
-                    </span>
-                    <h4 className="text-xs font-semibold text-slate-800 pt-1">
-                      Set Raindrop Token
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      Go to Settings in Desktop app & paste your token.
-                    </p>
-                  </div>
-
-                  <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1">
-                    <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
-                      STEP 3
-                    </span>
-                    <h4 className="text-xs font-semibold text-slate-800 pt-1">
-                      Click Sync Now
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      Click Sync Now and then refresh this page.
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={fetchSyncData}
-                  disabled={syncLoading}
-                  className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium shadow-sm transition-all active:scale-95"
-                >
-                  <RefreshCw
-                    className={`w-3.5 h-3.5 ${syncLoading ? "animate-spin" : ""}`}
-                  />
-                  <span>Check Raindrop Again</span>
-                </button>
-              </div>
-            ) : validDevices.length === 0 ? (
-              /* Synctable Collection Found But 0 Items */
-              <div className="py-16 px-6 bg-white rounded-2xl border border-slate-200/80 text-center max-w-lg mx-auto space-y-5 shadow-xs">
-                <div className="w-14 h-14 rounded-2xl bg-cyan-50 border border-cyan-200 flex items-center justify-center text-cyan-600 mx-auto">
-                  <HardDrive className="w-7 h-7" />
-                </div>
-                <div className="space-y-1.5">
-                  <h3 className="text-base font-bold text-slate-900">
-                    Collection &quot;Synctable&quot; is Empty
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    The root collection was found, but no non-empty device snapshots have
-                    been uploaded yet. Trigger a sync from your SyncTable desktop
-                    daemon.
-                  </p>
-                </div>
-                <button
-                  onClick={fetchSyncData}
-                  disabled={syncLoading}
-                  className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium shadow-sm transition-all"
-                >
-                  <RefreshCw
-                    className={`w-3.5 h-3.5 ${syncLoading ? "animate-spin" : ""}`}
-                  />
-                  <span>Refresh</span>
-                </button>
-              </div>
-            ) : (
-              /* Devices and Browser Trees Available */
-              <div className="space-y-5">
-                {/* Search & Filter Toolbar */}
-                <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-stretch md:items-center gap-3">
-                  {/* Search Input */}
-                  <div className="relative flex-1 min-w-0">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search tabs, URLs, or profiles..."
-                      className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all text-slate-800 placeholder:text-slate-400"
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery("")}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
-                        title="Clear search"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Filter Dropdowns on the Right Side */}
-                  <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
-                    {/* Devices Dropdown */}
-                    <div className="relative flex-1 sm:flex-initial min-w-[150px]">
-                      <Laptop className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <select
-                        value={selectedDeviceId}
-                        onChange={(e) => setSelectedDeviceId(e.target.value)}
-                        className="w-full pl-8 pr-8 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-100/80 focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all appearance-none cursor-pointer truncate"
-                        title="Filter by Device"
-                      >
-                        <option value="all">All Devices ({validDevices.length})</option>
-                        {validDevices.map((device) => {
-                          const deviceTabsCount = device.tree.reduce(
-                            (acc, t) => acc + countTabs(t),
-                            0
-                          );
-                          return (
-                            <option key={device.deviceId} value={device.deviceId}>
-                              {device.deviceName} ({deviceTabsCount} tabs)
-                            </option>
-                          );
-                        })}
-                      </select>
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
-
-                    {/* Browsers Dropdown */}
-                    <div className="relative flex-1 sm:flex-initial min-w-[130px]">
-                      <Globe className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                      <select
-                        value={selectedBrowser}
-                        onChange={(e) => setSelectedBrowser(e.target.value)}
-                        className="w-full pl-8 pr-8 py-2 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-100/80 focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all appearance-none cursor-pointer truncate"
-                        title="Filter by Browser"
-                      >
-                        <option value="all">All Browsers</option>
-                        {availableBrowsers.map((b) => (
-                          <option key={b} value={b}>
-                            {b.toUpperCase()}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Device Trees / Zen Sidebars View Container */}
-                <div className="space-y-6">
-                  {visibleDevices.map((device) => {
-                    const filteredRoots = device.tree.filter((node) => {
-                      if (countTabs(node) === 0) return false;
-                      if (selectedBrowser !== "all" && node.browser_name) {
-                        return node.browser_name.toLowerCase() === selectedBrowser.toLowerCase();
-                      }
-                      return true;
-                    });
-
-                    const deviceTabsCount = filteredRoots.reduce((acc, r) => acc + countTabs(r), 0);
-                    const deviceWorkspacesCount = filteredRoots.reduce(
-                      (acc, r) => acc + countWorkspaces(r),
-                      0
-                    );
-                    const deviceBrowsers = Array.from(
-                      new Set(
-                        filteredRoots
-                          .map((b) => b.browser_name?.toLowerCase())
-                          .filter((b): b is string => Boolean(b))
-                      )
-                    ).sort();
-
-                    const browserGroups = (() => {
-                      const map = new Map<string, BrowserTreeNode[]>();
-                      for (const root of filteredRoots) {
-                        const bName = (root.browser_name || "browser").toLowerCase();
-                        if (!map.has(bName)) {
-                          map.set(bName, []);
-                        }
-                        map.get(bName)!.push(root);
-                      }
-                      return Array.from(map.entries());
-                    })();
-
-                    return (
-                      <div
-                        key={device.deviceId}
-                        className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden"
-                      >
-                        {/* Device Tree Header Banner */}
-                        <div className="bg-slate-50/90 px-4 py-3 border-b border-slate-200/80 flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center space-x-2.5">
-                            <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
-                              <Laptop className="w-4 h-4" />
-                            </div>
-                            <div>
-                              <h2 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                                {device.deviceName}
-                                <span className="text-[10px] font-medium text-slate-500 bg-slate-200/60 px-1.5 py-0.2 rounded font-mono">
-                                  {device.fileName}
-                                </span>
-                              </h2>
-                              <p className="text-[10px] text-slate-500">
-                                Last synced {formatRelativeTime(device.lastUpdated)} &middot;{" "}
-                                {deviceTabsCount} tabs &middot;{" "}
-                                {deviceWorkspacesCount} workspaces
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            {deviceBrowsers.map((b) => (
-                              <span
-                                key={b}
-                                className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 shadow-2xs"
-                              >
-                                {b}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Content Area: Zen Sidebar View or Zen Tree View */}
-                        <div className="p-4 space-y-4">
-                          {filteredRoots.length === 0 ? (
-                            <div className="py-8 text-center text-xs text-slate-400">
-                              No tree snapshots match the current filters inside {device.fileName}.
-                            </div>
-                          ) : viewMode === "zen_sidebar" ? (
-                            /* Zen Browser Sidebar Mode */
-                            <div className="space-y-6">
-                              {browserGroups.map(([browserName, browserTrees]) => {
-                                const workspaces = browserTrees.flatMap(extractWorkspacesFromRoot);
-                                if (workspaces.length === 0) return null;
-
-                                return (
-                                  <div key={browserName} className="space-y-3">
-                                    <div className="flex items-center gap-2 px-1">
-                                      <span className="text-xs uppercase font-bold tracking-wider text-slate-500">
-                                        {browserName}
-                                      </span>
-                                      <span className="text-[11px] font-medium text-slate-400">
-                                        ({workspaces.length} {workspaces.length === 1 ? "workspace" : "workspaces"})
-                                      </span>
-                                    </div>
-                                    {/* Arrange each workspace as a separate card in the grid */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
-                                      {workspaces.map((wsItem) => (
-                                        <ZenSidebarView
-                                          key={wsItem.id}
-                                          workspaceItem={wsItem}
-                                          searchQuery={searchQuery}
-                                        />
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          ) : (
-                            /* Zen Tree Hierarchy Mode */
-                            <div className="space-y-1 max-h-[680px] overflow-y-auto zen-scrollbar">
-                              {filteredRoots.map((node) => (
-                                <TreeNodeItem
-                                  key={node.id || `${node.browser_name}_${node.profile_name}_${node.sort_order}`}
-                                  node={node}
-                                  searchQuery={searchQuery}
-                                  browserFilter={selectedBrowser}
-                                  nodeTypeFilter={nodeTypeFilter}
-                                  defaultExpanded={treeExpandedState}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+            <MultiDeviceCardsPortal
+              data={syncData}
+              loading={syncLoading}
+              onRefresh={fetchSyncData}
+            />
           </div>
         )}
+
       </div>
 
       {/* Footer */}

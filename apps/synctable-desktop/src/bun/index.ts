@@ -4,8 +4,10 @@ import { platform } from "node:os";
 import { join } from "node:path";
 import { SyncTableDB } from "./db";
 import { defaultKeychain } from "./keychain";
+import { defaultRaindropClient } from "./raindrop";
 import { BrowserSyncManager } from "./sync";
-import type { SyncTableRPCSchema } from "../shared/types";
+import type { CloudSyncResponse, SyncTableRPCSchema } from "../shared/types";
+
 
 const db = new SyncTableDB();
 const syncManager = new BrowserSyncManager(db);
@@ -75,12 +77,18 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
       },
       setDeviceName: ({ deviceName }) => {
         db.setDeviceName(deviceName);
+        // Invalidate cache so updated device name is reflected
+        cachedCloudData = null;
       },
       getRaindropToken: () => {
         return defaultKeychain.getRaindropToken();
       },
       setRaindropToken: ({ token }) => {
         defaultKeychain.setRaindropToken(token);
+        cachedCloudData = null;
+      },
+      getCloudData: async () => {
+        return await getCachedOrFreshCloudData();
       },
       openExternalURL: ({ url }) => {
         if (!url) return;
@@ -95,6 +103,57 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
     },
   },
 });
+
+let cachedCloudData: CloudSyncResponse | null = null;
+let lastCloudFetchTime = 0;
+let inFlightCloudFetch: Promise<CloudSyncResponse> | null = null;
+const CLOUD_CACHE_TTL_MS = 25000; // 25 seconds cache
+
+async function getCachedOrFreshCloudData(forceRefresh = false): Promise<CloudSyncResponse> {
+  const token = defaultKeychain.getRaindropToken()?.trim();
+  if (!token) {
+    return {
+      authenticated: false,
+      devices: [],
+      error: "Raindrop API token is not configured.",
+    };
+  }
+
+  const now = Date.now();
+  if (!forceRefresh && cachedCloudData && now - lastCloudFetchTime < CLOUD_CACHE_TTL_MS) {
+    return cachedCloudData;
+  }
+
+  if (inFlightCloudFetch) {
+    return inFlightCloudFetch;
+  }
+
+  inFlightCloudFetch = (async () => {
+    try {
+      const data = await defaultRaindropClient.fetchCloudDevices(token);
+      if (data.authenticated) {
+        cachedCloudData = data;
+        lastCloudFetchTime = Date.now();
+      }
+      return data;
+    } catch (err: any) {
+      if (cachedCloudData) {
+        return cachedCloudData;
+      }
+      return {
+        authenticated: true,
+        collection: null,
+        devices: [],
+        error: err?.message || String(err),
+      };
+    } finally {
+      inFlightCloudFetch = null;
+    }
+  })();
+
+  return inFlightCloudFetch;
+}
+
 
 // Create main window
 const win = new BrowserWindow({
@@ -180,7 +239,8 @@ function monitorMacLifecycle() {
     const decoder = new TextDecoder();
     let buffered = "";
 
-    for await (const chunk of monitor.stdout) {
+    for await (const chunk of monitor.stdout as any) {
+
       buffered += decoder.decode(chunk, { stream: true });
       const states = buffered.split("\n");
       buffered = states.pop() ?? "";

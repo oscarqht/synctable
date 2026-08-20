@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  
+  /* Zen Design System Variables */
+  --zen-primary-color: #06b6d4;
+  --zen-primary-color-rgb: 6, 182, 212;
+  --zen-toolbar-element-bg: rgba(0, 0, 0, 0.05);
+  --zen-toolbar-element-bg-hover: rgba(0, 0, 0, 0.08);
+  --zen-folder-behind-bgcolor: #cbd5e1;
+  --zen-folder-front-bgcolor: #94a3b8;
+  --zen-folder-stroke: #475569;
+  --zen-folder-indent: 14px;
+  --zen-border-radius: 10px;
+  --zen-tab-border-radius: 8px;
+  --zen-active-tab-scale: 0.98;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --zen-toolbar-element-bg: rgba(255, 255, 255, 0.08);
+    --zen-toolbar-element-bg-hover: rgba(255, 255, 255, 0.12);
+    --zen-folder-behind-bgcolor: #334155;
+    --zen-folder-front-bgcolor: #475569;
+    --zen-folder-stroke: #94a3b8;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+}
+
+/* Zen 3D Folder Flap Animations */
+.zen-folder-icon-svg .back,
+.zen-folder-icon-svg .front,
+.zen-folder-icon-svg .dots,
+.zen-folder-icon-svg .icon {
+  transition: transform 0.3s cubic-bezier(0.42, 0, 0, 1), opacity 0.3s cubic-bezier(0.42, 0, 0, 1);
+  transform-origin: center bottom;
+}
+
+.zen-folder-icon-svg[data-state="open"] .back {
+  transform: skewX(14deg) translate(-3px, 1.5px) scale(0.88);
+}
+
+.zen-folder-icon-svg[data-state="open"] .front {
+  transform: skewX(-14deg) translate(6px, 1.5px) scale(0.88);
+}
+
+.zen-folder-icon-svg[data-state="open"] .dots {
+  opacity: 0.4;
+  transform: skewX(-14deg) translate(6px, 1.5px) scale(0.88);
+}
+
+/* Zen Scrollbars */
+.zen-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.zen-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.zen-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+.zen-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(148, 163, 184, 0.6);
+}

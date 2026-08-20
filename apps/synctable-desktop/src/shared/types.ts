@@ -49,6 +49,46 @@ export interface AppPreferences {
   raindropToken?: string;
 }
 
+export interface RaindropUserProfile {
+  id: number;
+  name: string;
+  email?: string;
+  avatarUrl?: string;
+  isPro?: boolean;
+}
+
+export interface DeviceStats {
+  totalNodes: number;
+  totalTabs: number;
+  totalWorkspaces: number;
+  totalFolders: number;
+  totalWindows: number;
+  browsers: string[];
+}
+
+export interface CloudDeviceData {
+  id: number | string;
+  deviceId: string;
+  deviceName: string;
+  fileName: string;
+  fileSize?: number;
+  lastUpdated: string;
+  tree: BrowserTreeNode[];
+  stats: DeviceStats;
+}
+
+export interface CloudSyncResponse {
+  authenticated: boolean;
+  user?: RaindropUserProfile | null;
+  collection?: {
+    id: number;
+    title: string;
+    count: number;
+  } | null;
+  devices: CloudDeviceData[];
+  error?: string;
+}
+
 export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
   bun: {
     requests: {
@@ -84,6 +124,10 @@ export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
         params: { token: string };
         response: void;
       };
+      getCloudData: {
+        params: void;
+        response: CloudSyncResponse;
+      };
       openExternalURL: {
         params: { url: string };
         response: void;
@@ -100,3 +144,4 @@ export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
     };
   };
 }
+
