@@ -257,7 +257,7 @@ export function TreeNodeItem({
           paddingLeft: `${Math.max(depth * 16 + 8, 8)}px`,
           ...workspaceBgStyle,
         }}
-        className={`flex items-center gap-2 py-1.5 px-2.5 rounded-xl transition-all duration-150 active:scale-[0.99] ${
+        className={`flex items-center gap-2 py-1.5 px-2.5 min-h-[32px] rounded-xl transition-all duration-150 active:scale-[0.99] ${
           hasChildren ? "cursor-pointer" : "cursor-default"
         } ${
           isRoot
@@ -375,11 +375,11 @@ export function TreeNodeItem({
 
         {/* Actions for Tab Nodes */}
         {node.url && (
-          <div className="flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover/node:opacity-100 transition-opacity shrink-0 ml-2">
+          <div className="hidden group-hover/node:flex items-center gap-1 shrink-0 ml-2 -my-1">
             <button
               onClick={handleCopyUrl}
               title="Copy URL"
-              className="p-1 rounded-md text-slate-400 hover:text-cyan-700 hover:bg-cyan-50 dark:hover:bg-slate-800 border border-transparent hover:border-cyan-200 transition-all"
+              className="w-5 h-5 flex items-center justify-center rounded-md text-slate-400 hover:text-cyan-700 hover:bg-cyan-50 dark:hover:bg-slate-800 border border-transparent hover:border-cyan-200 transition-all"
             >
               {copied ? (
                 <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -393,7 +393,7 @@ export function TreeNodeItem({
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               title="Open tab in new window"
-              className="p-1 rounded-md text-slate-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-slate-800 border border-transparent hover:border-indigo-200 transition-all"
+              className="w-5 h-5 flex items-center justify-center rounded-md text-slate-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-slate-800 border border-transparent hover:border-indigo-200 transition-all"
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </a>

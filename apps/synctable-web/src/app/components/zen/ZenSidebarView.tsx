@@ -165,12 +165,10 @@ export function ZenSidebarView({
   return (
     <div
       style={themeBgStyle}
-      className={`flex flex-col border rounded-3xl p-3 sm:p-4 shadow-sm w-full transition-all ${
+      className={`flex flex-col border border-gray-300 dark:border-gray-600 rounded-3xl p-3 sm:p-4 shadow-sm w-full transition-all ${
         hasThemeBg
-          ? isDark
-            ? "border-white/15"
-            : "border-black/10"
-          : "bg-slate-100/90 dark:bg-slate-900/90 border-slate-200/80 dark:border-slate-800/80"
+          ? ""
+          : "bg-slate-100/90 dark:bg-slate-900/90"
       }`}
     >
       {/* Top Controls: Browser & Profile Info + Tab Count */}

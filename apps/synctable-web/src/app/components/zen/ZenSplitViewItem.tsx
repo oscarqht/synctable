@@ -129,17 +129,17 @@ export function ZenSplitViewItem({
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between mt-0.5">
+                <div className="flex items-center justify-between mt-0.5 h-4">
                   <span className="text-[9px] text-slate-400 dark:text-slate-500 truncate max-w-[80px]">
                     {domain || "about:blank"}
                   </span>
 
                   {tab.url && (
-                    <div className="opacity-100 md:opacity-0 md:group-hover/pane:opacity-100 flex items-center gap-0.5 transition-opacity">
+                    <div className="hidden group-hover/pane:flex items-center gap-0.5 shrink-0">
                       <button
                         onClick={(e) => handleCopyUrl(e, tab)}
                         title="Copy URL"
-                        className="p-0.5 rounded text-slate-400 hover:text-cyan-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                        className="w-4 h-4 flex items-center justify-center rounded text-slate-400 hover:text-cyan-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
                       >
                         {isCopied ? (
                           <Check className="w-2.5 h-2.5 text-emerald-600" />
@@ -153,7 +153,7 @@ export function ZenSplitViewItem({
                         rel="noopener noreferrer"
                         onClick={(e) => e.stopPropagation()}
                         title="Open pane URL"
-                        className="p-0.5 rounded text-slate-400 hover:text-indigo-600 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
+                        className="w-4 h-4 flex items-center justify-center rounded text-slate-400 hover:text-indigo-600 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
                       >
                         <ExternalLink className="w-2.5 h-2.5" />
                       </a>

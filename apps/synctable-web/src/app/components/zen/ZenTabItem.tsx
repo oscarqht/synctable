@@ -93,7 +93,7 @@ export function ZenTabItem({
   return (
     <div
       onClick={() => onSelect?.(tab)}
-      className={`group/tab relative flex items-center gap-3 px-3.5 py-2.5 rounded-2xl cursor-pointer transition-all duration-150 select-none ${
+      className={`group/tab relative flex items-center gap-3 px-3.5 py-2.5 min-h-[42px] rounded-2xl cursor-pointer transition-all duration-150 select-none ${
         isActive
           ? "bg-white text-slate-900 shadow-sm border border-slate-100 dark:border-slate-700/60 font-bold"
           : isDarkTheme
@@ -129,11 +129,11 @@ export function ZenTabItem({
 
       {/* Hover Action Buttons */}
       {tab.url && (
-        <div className="opacity-100 md:opacity-0 md:group-hover/tab:opacity-100 flex items-center gap-1 transition-opacity shrink-0">
+        <div className="hidden group-hover/tab:flex items-center gap-1 shrink-0 -my-1">
           <button
             onClick={handleCopyUrl}
             title="Copy URL"
-            className={`p-1 rounded-md transition-all ${
+            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
               isDarkTheme
                 ? "text-white/70 hover:text-white hover:bg-white/20"
                 : "text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-slate-100 dark:hover:bg-slate-700"
@@ -152,7 +152,7 @@ export function ZenTabItem({
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
             title="Open URL in new window"
-            className={`p-1 rounded-md transition-all ${
+            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
               isDarkTheme
                 ? "text-white/70 hover:text-white hover:bg-white/20"
                 : "text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-slate-700"
