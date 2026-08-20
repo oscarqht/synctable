@@ -13,4 +13,5 @@ export * from "./components/zen/ZenPinnedTabsSection";
 export * from "./components/zen/ZenWorkspaceBar";
 export * from "./components/zen/ZenSidebarView";
 export * from "./components/TreeNodeItem";
+export * from "./components/DeviceCard";
 export * from "./components/MultiDeviceCardsPortal";

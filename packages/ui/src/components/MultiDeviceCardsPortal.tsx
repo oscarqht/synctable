@@ -21,6 +21,7 @@ import {
   formatRelativeTime,
 } from "../utils/treeUtils";
 import { ZenSidebarView } from "./zen/ZenSidebarView";
+import { DeviceCard } from "./DeviceCard";
 
 export interface MultiDeviceCardsPortalProps {
   data: SynctableSyncResponse | null;
@@ -86,83 +87,8 @@ export function MultiDeviceCardsPortal({
     }
   };
 
-  // 1. Unauthenticated or Token Missing State
-  if (!data?.authenticated || (data.error && validDevices.length === 0 && !data.collection)) {
-    return (
-      <div className="py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center max-w-lg mx-auto space-y-5 shadow-sm my-6">
-        <div className="w-14 h-14 rounded-2xl bg-cyan-50 dark:bg-cyan-950/60 border border-cyan-200 dark:border-cyan-800 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mx-auto text-2xl">
-          💧
-        </div>
-        <div className="space-y-1.5">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-            Raindrop.io API Token Required
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            {data?.error ||
-              "Enter your Raindrop.io API Test Token below to connect and view browser workspaces from all your devices."}
-          </p>
-        </div>
-
-        {onSaveToken && (
-          <form onSubmit={handleTokenSubmit} className="space-y-3 text-left pt-2 max-w-sm mx-auto">
-            <div>
-              <input
-                type="password"
-                value={tokenInput}
-                onChange={(e) => setTokenInput(e.target.value)}
-                placeholder="Paste Raindrop API test token here"
-                className="w-full px-3.5 py-2.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all text-slate-800 dark:text-slate-200"
-              />
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={savingToken || !tokenInput.trim()}
-                className="flex-1 flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 text-white dark:text-slate-900 font-medium text-xs shadow-sm transition-all"
-              >
-                {savingToken ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-cyan-400 dark:text-cyan-600" />
-                )}
-                <span>Connect API Token</span>
-              </button>
-              {onRefresh && (
-                <button
-                  type="button"
-                  onClick={onRefresh}
-                  disabled={loading}
-                  className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium transition-all"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-                </button>
-              )}
-            </div>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
-              Get your token from{" "}
-              <a
-                href="https://app.raindrop.io/settings/integrations"
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={(e) => {
-                  if (onOpenExternal) {
-                    e.preventDefault();
-                    onOpenExternal("https://app.raindrop.io/settings/integrations");
-                  }
-                }}
-                className="text-cyan-600 dark:text-cyan-400 hover:underline"
-              >
-                Raindrop.io Settings → Integrations
-              </a>
-            </p>
-          </form>
-        )}
-      </div>
-    );
-  }
-
-  // 2. Loading State (when no data loaded yet)
-  if (loading && !data) {
+  // 1. Loading State (when no data loaded yet or actively loading without existing data)
+  if (!data || (loading && !data)) {
     return (
       <div className="py-20 flex flex-col items-center justify-center space-y-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 my-6">
         <Loader2 className="w-8 h-8 animate-spin text-cyan-600 dark:text-cyan-400" />
@@ -174,6 +100,111 @@ export function MultiDeviceCardsPortal({
             Querying Raindrop.io REST API and parsing JSON files
           </p>
         </div>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated / Missing Token State (Desktop flow where onSaveToken is provided)
+  if (data.authenticated === false && onSaveToken) {
+    return (
+      <div className="py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center max-w-lg mx-auto space-y-5 shadow-sm my-6">
+        <div className="w-14 h-14 rounded-2xl bg-cyan-50 dark:bg-cyan-950/60 border border-cyan-200 dark:border-cyan-800 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mx-auto text-2xl">
+          💧
+        </div>
+        <div className="space-y-1.5">
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            Raindrop.io API Token Required
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {data.error ||
+              "Enter your Raindrop.io API Test Token below to connect and view browser workspaces from all your devices."}
+          </p>
+        </div>
+
+        <form onSubmit={handleTokenSubmit} className="space-y-3 text-left pt-2 max-w-sm mx-auto">
+          <div>
+            <input
+              type="password"
+              value={tokenInput}
+              onChange={(e) => setTokenInput(e.target.value)}
+              placeholder="Paste Raindrop API test token here"
+              className="w-full px-3.5 py-2.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all text-slate-800 dark:text-slate-200"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={savingToken || !tokenInput.trim()}
+              className="flex-1 flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 text-white dark:text-slate-900 font-medium text-xs shadow-sm transition-all"
+            >
+              {savingToken ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400 dark:text-cyan-600" />
+              )}
+              <span>Connect API Token</span>
+            </button>
+            {onRefresh && (
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={loading}
+                className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium transition-all"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
+            Get your token from{" "}
+            <a
+              href="https://app.raindrop.io/settings/integrations"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => {
+                if (onOpenExternal) {
+                  e.preventDefault();
+                  onOpenExternal("https://app.raindrop.io/settings/integrations");
+                }
+              }}
+              className="text-cyan-600 dark:text-cyan-400 hover:underline"
+            >
+              Raindrop.io Settings → Integrations
+            </a>
+          </p>
+        </form>
+      </div>
+    );
+  }
+
+  // 3. Error State (or unauthenticated state when onSaveToken is not present)
+  if ((data.authenticated === false && !onSaveToken) || (data.error && validDevices.length === 0 && !data.collection)) {
+    return (
+      <div className="py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-rose-200 dark:border-rose-900/60 text-center max-w-lg mx-auto space-y-5 shadow-sm my-6">
+        <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 flex items-center justify-center text-rose-600 dark:text-rose-400 mx-auto">
+          <AlertCircle className="w-7 h-7" />
+        </div>
+        <div className="space-y-1.5">
+          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+            {data.authenticated === false ? "Authentication Required" : "Failed to Load Raindrop Snapshots"}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {data.error || "Please log in again to access your Synctable workspaces."}
+          </p>
+        </div>
+        {onRefresh && (
+          <div className="flex justify-center pt-2">
+            <button
+              type="button"
+              onClick={onRefresh}
+              disabled={loading}
+              className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium shadow-sm transition-all"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <span>Try Again</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -384,120 +415,19 @@ export function MultiDeviceCardsPortal({
 
       {/* Device Trees / Zen Sidebars View Container */}
       <div className="space-y-6">
-        {visibleDevices.map((device) => {
-          const filteredRoots = device.tree.filter((node) => {
-            if (countTabs(node) === 0) return false;
-            if (selectedBrowser !== "all" && node.browser_name) {
-              return node.browser_name.toLowerCase() === selectedBrowser.toLowerCase();
-            }
-            return true;
-          });
-
-          const deviceTabsCount = filteredRoots.reduce((acc, r) => acc + countTabs(r), 0);
-          const deviceWorkspacesCount = filteredRoots.reduce(
-            (acc, r) => acc + countWorkspaces(r),
-            0
-          );
-          const deviceBrowsers = Array.from(
-            new Set(
-              filteredRoots
-                .map((b) => b.browser_name?.toLowerCase())
-                .filter((b): b is string => Boolean(b))
-            )
-          ).sort();
-
-          const browserGroups = (() => {
-            const map = new Map<string, BrowserTreeNode[]>();
-            for (const root of filteredRoots) {
-              const bName = (root.browser_name || "browser").toLowerCase();
-              if (!map.has(bName)) {
-                map.set(bName, []);
-              }
-              map.get(bName)!.push(root);
-            }
-            return Array.from(map.entries());
-          })();
-
-          return (
-            <div
-              key={device.deviceId}
-              className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden"
-            >
-              {/* Device Tree Header Banner */}
-              <div className="bg-slate-50/90 dark:bg-slate-950/90 px-4 py-3 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-7 h-7 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-700 dark:text-indigo-300">
-                    <Laptop className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                      {device.deviceName}
-                      <span className="text-[10px] font-medium text-slate-500 bg-slate-200/60 dark:bg-slate-800 px-1.5 py-0.2 rounded font-mono">
-                        {device.fileName}
-                      </span>
-                    </h2>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                      Last synced {formatRelativeTime(device.lastUpdated)} &middot;{" "}
-                      {deviceTabsCount} tabs &middot; {deviceWorkspacesCount} workspaces
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  {deviceBrowsers.map((b) => (
-                    <span
-                      key={b}
-                      className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 shadow-2xs"
-                    >
-                      {b}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Content Area: Zen Sidebar View */}
-              <div className="p-4 space-y-4">
-                {filteredRoots.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-slate-400">
-                    No tree snapshots match the current filters inside {device.fileName}.
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {browserGroups.map(([browserName, browserTrees]) => {
-                      const workspaces = browserTrees.flatMap(extractWorkspacesFromRoot);
-                      if (workspaces.length === 0) return null;
-
-                      return (
-                        <div key={browserName} className="space-y-3">
-                          <div className="flex items-center gap-2 px-1">
-                            <span className="text-xs uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
-                              {browserName}
-                            </span>
-                            <span className="text-[11px] font-medium text-slate-400">
-                              ({workspaces.length}{" "}
-                              {workspaces.length === 1 ? "workspace" : "workspaces"})
-                            </span>
-                          </div>
-                          {/* Arrange each workspace as a separate card in the grid */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
-                            {workspaces.map((wsItem) => (
-                              <ZenSidebarView
-                                key={wsItem.id}
-                                workspaceItem={wsItem}
-                                searchQuery={searchQuery}
-                                onOpenExternal={onOpenExternal}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {visibleDevices.map((device) => (
+          <DeviceCard
+            key={device.deviceId}
+            deviceName={device.deviceName}
+            badge={device.fileName}
+            lastUpdated={device.lastUpdated}
+            lastUpdatedLabel="Last synced"
+            trees={device.tree}
+            selectedBrowser={selectedBrowser}
+            searchQuery={searchQuery}
+            onOpenExternal={onOpenExternal}
+          />
+        ))}
       </div>
     </div>
   );

@@ -42,12 +42,16 @@ body {
 }
 
 /* macOS Titlebar Drag Region */
-.titlebar-drag-region {
+.titlebar-drag-region,
+.electrobun-webkit-app-region-drag {
   -webkit-app-region: drag;
+  app-region: drag;
 }
 
-.titlebar-no-drag {
+.titlebar-no-drag,
+.electrobun-webkit-app-region-no-drag {
   -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 /* Zen 3D Folder Flap Animations */

@@ -168,9 +168,12 @@ export function App({ rpc }: AppProps) {
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 font-sans select-none">
       {/* Top Navigation Bar with macOS Inset Drag Area */}
-      <header className="h-12 border-b border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-4 shrink-0 titlebar-drag-region">
+      <header
+        style={{ WebkitAppRegion: "drag", appRegion: "drag" } as React.CSSProperties}
+        className="h-12 border-b border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-4 shrink-0 electrobun-webkit-app-region-drag titlebar-drag-region"
+      >
         {/* Left: Brand with spacing for macOS traffic light buttons */}
-        <div className="flex items-center space-x-2.5 pl-18 titlebar-no-drag">
+        <div className="flex items-center space-x-2.5 pl-20">
           <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-xs">
             🔄
           </div>
@@ -185,7 +188,10 @@ export function App({ rpc }: AppProps) {
         </div>
 
         {/* Center: Segmented Tab Switcher */}
-        <div className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 titlebar-no-drag">
+        <div
+          style={{ WebkitAppRegion: "no-drag", appRegion: "no-drag" } as React.CSSProperties}
+          className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 electrobun-webkit-app-region-no-drag titlebar-no-drag"
+        >
           <button
             onClick={() => handleTabSwitch("local")}
             className={`flex items-center space-x-1.5 px-3.5 py-1 rounded-lg text-xs font-semibold transition-all ${
@@ -217,7 +223,10 @@ export function App({ rpc }: AppProps) {
         </div>
 
         {/* Right: User Pill & Settings */}
-        <div className="flex items-center space-x-2 titlebar-no-drag">
+        <div
+          style={{ WebkitAppRegion: "no-drag", appRegion: "no-drag" } as React.CSSProperties}
+          className="flex items-center space-x-2 electrobun-webkit-app-region-no-drag titlebar-no-drag"
+        >
           {user && (
             <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300">
               {user.avatarUrl ? (
@@ -255,13 +264,16 @@ export function App({ rpc }: AppProps) {
       {/* Main Content View */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {activeTab === "local" ? (
-          <LocalTab
-            stats={stats}
-            trees={trees}
-            syncing={localSyncing}
-            onSync={handleSyncNow}
-            onOpenExternal={handleOpenExternal}
-          />
+          <div className="flex-1 p-5 overflow-y-auto zen-scrollbar">
+            <LocalTab
+              stats={stats}
+              trees={trees}
+              syncing={localSyncing}
+              onSync={handleSyncNow}
+              onOpenExternal={handleOpenExternal}
+              deviceName={savedDeviceName}
+            />
+          </div>
         ) : (
           <div className="flex-1 p-5 overflow-y-auto zen-scrollbar">
             <MultiDeviceCardsPortal

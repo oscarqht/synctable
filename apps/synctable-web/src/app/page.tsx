@@ -148,6 +148,9 @@ export default function Home() {
         setSyncData(data);
       } else {
         const errorData = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          setUser(null);
+        }
         setErrorMessage(
           errorData.error || "Failed to load Synctable data from Raindrop"
         );
