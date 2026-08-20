@@ -31,6 +31,150 @@ export function parseZenSessionstore(options: ZenParserOptions): BrowserTreeNode
   return parseZenSessionData(JSON.parse(jsonString), options);
 }
 
+function clamp255(val: unknown): number {
+  if (typeof val !== "number" || isNaN(val)) return 0;
+  const normalized = val > 1.5 ? val : val * 255;
+  return Math.min(255, Math.max(0, Math.round(normalized)));
+}
+
+export function extractZenColor(colorObj: unknown): string | null {
+  if (!colorObj) return null;
+  if (typeof colorObj === "string") {
+    const s = colorObj.trim();
+    if (s.startsWith("#")) {
+      if (s.length === 4) {
+        return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`.toLowerCase();
+      }
+      return s.slice(0, 7).toLowerCase();
+    }
+    const rgbMatch = s.match(/rgba?\s*\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)/i);
+    if (rgbMatch) {
+      const r = clamp255(Number(rgbMatch[1])).toString(16).padStart(2, "0");
+      const g = clamp255(Number(rgbMatch[2])).toString(16).padStart(2, "0");
+      const b = clamp255(Number(rgbMatch[3])).toString(16).padStart(2, "0");
+      return `#${r}${g}${b}`;
+    }
+    return null;
+  }
+  if (Array.isArray(colorObj) && colorObj.length >= 3 && typeof colorObj[0] === "number") {
+    const r = clamp255(colorObj[0]).toString(16).padStart(2, "0");
+    const g = clamp255(colorObj[1]).toString(16).padStart(2, "0");
+    const b = clamp255(colorObj[2]).toString(16).padStart(2, "0");
+    return `#${r}${g}${b}`;
+  }
+  if (typeof colorObj === "object") {
+    const obj = colorObj as any;
+    if ("c" in obj) {
+      const fromC = extractZenColor(obj.c);
+      if (fromC) return fromC;
+    }
+    if ("hex" in obj && typeof obj.hex === "string") {
+      const fromHex = extractZenColor(obj.hex);
+      if (fromHex) return fromHex;
+    }
+    if ("color" in obj) {
+      const fromColor = extractZenColor(obj.color);
+      if (fromColor) return fromColor;
+    }
+    const r = obj.r ?? obj.red;
+    const g = obj.g ?? obj.green;
+    const b = obj.b ?? obj.blue;
+    if (typeof r === "number" && typeof g === "number" && typeof b === "number") {
+      const hr = clamp255(r).toString(16).padStart(2, "0");
+      const hg = clamp255(g).toString(16).padStart(2, "0");
+      const hb = clamp255(b).toString(16).padStart(2, "0");
+      return `#${hr}${hg}${hb}`;
+    }
+  }
+  return null;
+}
+
+export function extractZenIcon(space: any): string | null {
+  if (!space || typeof space !== "object") return null;
+  const rawIcon = space.icon ?? space.customIcon ?? space.iconType;
+  if (typeof rawIcon === "string") {
+    const trimmed = rawIcon.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+  if (rawIcon && typeof rawIcon === "object") {
+    if (typeof rawIcon.emoji === "string" && rawIcon.emoji.trim()) {
+      return rawIcon.emoji.trim();
+    }
+    if (typeof rawIcon.icon === "string" && rawIcon.icon.trim()) {
+      return rawIcon.icon.trim();
+    }
+    if (typeof rawIcon.url === "string" && rawIcon.url.trim()) {
+      return rawIcon.url.trim();
+    }
+  }
+  return null;
+}
+
+export function extractZenSpaceTheme(space: any): {
+  theme_color: string | null;
+  theme_colors: string[] | null;
+  icon: string | null;
+} {
+  const colors: string[] = [];
+  let primaryHex: string | null = null;
+
+  const theme = space?.theme;
+  if (theme && typeof theme === "object") {
+    const gradientColors = Array.isArray(theme.gradientColors) ? theme.gradientColors : [];
+    for (const item of gradientColors) {
+      const hex = extractZenColor(item);
+      if (hex) {
+        if (!colors.includes(hex)) colors.push(hex);
+        if (item && typeof item === "object" && item.isPrimary && !primaryHex) {
+          primaryHex = hex;
+        }
+      }
+    }
+
+    if (Array.isArray(theme.colors)) {
+      for (const item of theme.colors) {
+        const hex = extractZenColor(item);
+        if (hex && !colors.includes(hex)) colors.push(hex);
+      }
+    }
+
+    if (theme.primaryColor) {
+      const hex = extractZenColor(theme.primaryColor);
+      if (hex) {
+        if (!colors.includes(hex)) colors.push(hex);
+        if (!primaryHex) primaryHex = hex;
+      }
+    }
+    if (theme.color) {
+      const hex = extractZenColor(theme.color);
+      if (hex && !colors.includes(hex)) colors.push(hex);
+    }
+    if (theme.accentColor) {
+      const hex = extractZenColor(theme.accentColor);
+      if (hex && !colors.includes(hex)) colors.push(hex);
+    }
+  }
+
+  if (space?.color) {
+    const hex = extractZenColor(space.color);
+    if (hex && !colors.includes(hex)) colors.push(hex);
+  }
+  if (space?.themeColor) {
+    const hex = extractZenColor(space.themeColor);
+    if (hex && !colors.includes(hex)) colors.push(hex);
+  }
+  if (space?.accentColor) {
+    const hex = extractZenColor(space.accentColor);
+    if (hex && !colors.includes(hex)) colors.push(hex);
+  }
+
+  const icon = extractZenIcon(space);
+  const theme_color = primaryHex || (colors.length > 0 ? colors[0] : null);
+  const theme_colors = colors.length > 0 ? colors : null;
+
+  return { theme_color, theme_colors, icon };
+}
+
 export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "filePath">): BrowserTreeNode[] {
   const { osType, profileName, snapshotTime } = options;
   const nodes: BrowserTreeNode[] = [];
@@ -74,6 +218,7 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
       const sourceId = String(space?.uuid || `default-${spaceIdx}`);
       const workspaceId = `zen-${profileId}-win-${winIdx}-ws-${encodeURIComponent(sourceId)}`;
       workspaceIds.set(sourceId, workspaceId);
+      const { theme_color, theme_colors, icon } = extractZenSpaceTheme(space);
       nodes.push({
         id: workspaceId,
         browser_name: "zen",
@@ -85,6 +230,9 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
         parent_id: windowId,
         sort_order: spaceIdx,
         snapshot_time: snapshotTime,
+        theme_color,
+        theme_colors,
+        icon,
       });
     });
 
