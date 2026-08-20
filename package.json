@@ -2,6 +2,7 @@
   "name": "synctable-monorepo",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "bun@1.1.30",
   "type": "module",
   "workspaces": [
     "apps/*",
