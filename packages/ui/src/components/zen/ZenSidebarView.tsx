@@ -318,10 +318,6 @@ export function ZenSidebarView({
           >
             <span className="material-symbols-outlined text-[18px]">open_in_new</span>
           </button>
-
-          <span className={`px-2 py-1 rounded-full font-label-md text-label-md font-bold ${badgeClasses}`}>
-            {tabCount} {tabCount === 1 ? "tab" : "tabs"}
-          </span>
         </div>
       </div>
 

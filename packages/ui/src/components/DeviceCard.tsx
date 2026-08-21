@@ -168,11 +168,8 @@ export function DeviceCard({
                 <div className="flex justify-between items-end border-b border-surface-container-high pb-4">
                   <div className="flex items-center gap-2">
                     <h3 className="font-title-md text-title-md font-bold uppercase text-on-surface">
-                      {browserName} Workspaces
+                      {browserName}
                     </h3>
-                    <span className="font-body-sm text-body-sm text-on-surface-variant">
-                      ({workspaces.length} {workspaces.length === 1 ? "workspace" : "workspaces"})
-                    </span>
                   </div>
                   {browserLastUpdateTime && (
                     <span className="font-body-sm text-body-sm text-outline">
