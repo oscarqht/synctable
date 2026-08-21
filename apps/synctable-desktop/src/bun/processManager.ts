@@ -1,6 +1,6 @@
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
-import { existsSync, mkdirSync, cpSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, cpSync, readdirSync, rmSync } from "node:fs";
 import type { InstalledBrowser } from "../shared/types";
 
 export interface BrowserAppInfo {
@@ -17,35 +17,38 @@ export const KNOWN_BROWSERS: BrowserAppInfo[] = [
     name: "Arc Browser",
     bundleId: "company.thebrowser.Browser",
     appNames: ["Arc", "Arc.app"],
-    supportsOfflineInjection: true,
+    supportsOfflineInjection: false,
   },
   {
     id: "zen",
     name: "Zen Browser",
     bundleId: "app.zen-browser.zen",
     appNames: ["Zen", "Zen Browser", "Zen.app", "Zen Browser.app"],
-    supportsOfflineInjection: true,
+    supportsOfflineInjection: false,
   },
   {
     id: "chrome",
     name: "Google Chrome",
     bundleId: "com.google.Chrome",
     appNames: ["Google Chrome", "Google Chrome.app", "Chrome"],
-    supportsOfflineInjection: true,
+    // Chrome 151 resets the injected startup preference using its protected
+    // preferences MAC, then discards the staged session on launch.
+    supportsOfflineInjection: false,
   },
   {
     id: "firefox",
     name: "Firefox",
     bundleId: "org.mozilla.firefox",
     appNames: ["Firefox", "Firefox.app"],
-    supportsOfflineInjection: true,
+    supportsOfflineInjection: false,
   },
   {
     id: "vivaldi",
     name: "Vivaldi",
     bundleId: "com.vivaldi.Vivaldi",
     appNames: ["Vivaldi", "Vivaldi.app"],
-    supportsOfflineInjection: true,
+    // Keep disabled until the same launch-level validation passes for Vivaldi.
+    supportsOfflineInjection: false,
   },
   {
     id: "safari",
@@ -66,14 +69,14 @@ export const KNOWN_BROWSERS: BrowserAppInfo[] = [
     name: "Microsoft Edge",
     bundleId: "com.microsoft.edgemac",
     appNames: ["Microsoft Edge", "Microsoft Edge.app", "Edge"],
-    supportsOfflineInjection: true,
+    supportsOfflineInjection: false,
   },
   {
     id: "brave",
     name: "Brave Browser",
     bundleId: "com.brave.Browser",
     appNames: ["Brave Browser", "Brave Browser.app", "Brave"],
-    supportsOfflineInjection: true,
+    supportsOfflineInjection: false,
   },
 ];
 
@@ -300,17 +303,53 @@ export async function backupBrowserSession(browser: string, profileName?: string
       const prefFile = join(fullProf, "Preferences");
 
       mkdirSync(backupDir, { recursive: true });
+      let copiedState = false;
       if (existsSync(sessionsDir)) {
         cpSync(sessionsDir, join(backupDir, "Sessions"), { recursive: true });
+        copiedState = true;
       }
       if (existsSync(prefFile)) {
         cpSync(prefFile, join(backupDir, "Preferences"));
+        copiedState = true;
       }
-      return backupDir;
+      return copiedState ? backupDir : null;
     }
   }
 
   return null;
+}
+
+/** Restores the state captured by backupBrowserSession into the selected internal profile. */
+export async function restoreBrowserSessionBackup(browser: string, backupDir: string, profileName?: string): Promise<boolean> {
+  try {
+    const home = homedir();
+    const appSupport = join(home, "Library", "Application Support");
+    const b = browser.toLowerCase();
+    if (b === "chrome" || b === "vivaldi" || b === "brave" || b === "edge") {
+      const bases: Record<string, string> = {
+        chrome: join(appSupport, "Google", "Chrome"),
+        vivaldi: join(appSupport, "Vivaldi"),
+        brave: join(appSupport, "BraveSoftware", "Brave-Browser"),
+        edge: join(appSupport, "Microsoft Edge"),
+      };
+      const profile = profileName || "Default";
+      const target = join(bases[b], profile);
+      const sessionBackup = join(backupDir, "Sessions");
+      const preferencesBackup = join(backupDir, "Preferences");
+      if (!existsSync(sessionBackup) && !existsSync(preferencesBackup)) return false;
+      if (existsSync(sessionBackup)) {
+        rmSync(join(target, "Sessions"), { recursive: true, force: true });
+        cpSync(sessionBackup, join(target, "Sessions"), { recursive: true, force: true });
+      }
+      if (existsSync(preferencesBackup)) {
+        cpSync(preferencesBackup, join(target, "Preferences"), { force: true });
+      }
+      return true;
+    }
+  } catch {
+    return false;
+  }
+  return false;
 }
 
 export async function relaunchBrowser(browser: string): Promise<void> {
@@ -319,4 +358,13 @@ export async function relaunchBrowser(browser: string): Promise<void> {
   const target = b ? b.appNames[0].replace(/\.app$/, "") : browser;
 
   Bun.spawn(["open", "-a", target]);
+}
+
+export async function waitForBrowserLaunch(browser: string, timeoutMs = 8000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await isBrowserRunning(browser)) return true;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return false;
 }

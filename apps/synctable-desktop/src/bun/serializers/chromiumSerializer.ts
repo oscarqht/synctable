@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { extractWorkspacesFromRoot, isValidHttpUrl, type BrowserTreeNode } from "@synctable/ui";
+import { isValidHttpUrl, type BrowserTreeNode } from "@synctable/ui";
 
 export interface ChromiumSerializerOptions {
   profilePath: string;
@@ -54,6 +54,56 @@ interface FlattenedChromiumTab {
   workspaceTitle?: string;
 }
 
+interface RestoreWorkspace {
+  id: string;
+  title: string;
+  node: BrowserTreeNode;
+}
+
+interface RestoreWindow {
+  id: string;
+  workspaces: RestoreWorkspace[];
+}
+
+/**
+ * Keep explicit browser windows intact. A tree without explicit window nodes
+ * has no recoverable window boundary, so each top-level workspace becomes a
+ * separate target window (the previous, safest interpretation).
+ */
+function extractRestoreWindows(nodes: BrowserTreeNode[]): RestoreWindow[] {
+  const windows: RestoreWindow[] = [];
+  for (const root of nodes) {
+    const explicitWindows = (root.children || []).filter((child) => child.node_type === "window");
+    const sourceWindows = explicitWindows.length > 0 ? explicitWindows : [root];
+    for (const sourceWindow of sourceWindows) {
+      const workspaces = (sourceWindow.children || []).filter((child) => child.node_type === "workspace");
+      if (explicitWindows.length === 0 && workspaces.length > 0) {
+        for (const workspace of workspaces) {
+          windows.push({
+            id: `${root.id}-${workspace.id}`,
+            workspaces: [{ id: workspace.id, title: workspace.title || "Workspace", node: workspace }],
+          });
+        }
+      } else if (workspaces.length > 0) {
+        windows.push({
+          id: sourceWindow.id,
+          workspaces: workspaces.map((workspace) => ({
+            id: workspace.id,
+            title: workspace.title || "Workspace",
+            node: workspace,
+          })),
+        });
+      } else {
+        windows.push({
+          id: sourceWindow.id,
+          workspaces: [{ id: sourceWindow.id, title: sourceWindow.title || "Main Window", node: sourceWindow }],
+        });
+      }
+    }
+  }
+  return windows;
+}
+
 export function serializeToChromiumSession(
   nodes: BrowserTreeNode[],
   options: ChromiumSerializerOptions
@@ -77,8 +127,9 @@ export function serializeToChromiumSession(
       mkdirSync(sessionsDir, { recursive: true });
     }
 
-    const workspaces = nodes.flatMap(extractWorkspacesFromRoot);
-    if (workspaces.length === 0) {
+    const restoreWindows = extractRestoreWindows(nodes);
+    const workspaceCount = restoreWindows.reduce((count, window) => count + window.workspaces.length, 0);
+    if (restoreWindows.length === 0 || workspaceCount === 0) {
       return { success: false, spacesCount: 0, tabsCount: 0, error: "No workspaces found to restore" };
     }
 
@@ -90,18 +141,16 @@ export function serializeToChromiumSession(
     let groupTokenCounter = 1n;
     let splitTokenCounter = 100n;
 
-    workspaces.forEach((ws, wsIdx) => {
-      const wsId = ws.id || `ws-${wsIdx + 1}`;
-      const wsTitle = ws.workspaceTitle || `Workspace ${wsIdx + 1}`;
-      vivaldiWorkspacesList.push({ id: wsId, name: wsTitle });
-
-      const wsNode = ws.node;
-      if (!wsNode || !wsNode.children) return;
-
-      const windowId = wsIdx + 1;
+    restoreWindows.forEach((window, windowIndex) => {
+      const windowId = windowIndex + 1;
       let visualIndex = 0;
 
-      const processItem = (item: BrowserTreeNode, parentGroup?: { id: string; title: string; high: bigint; low: bigint }) => {
+      const processItem = (
+        item: BrowserTreeNode,
+        parentGroup: { id: string; title: string; high: bigint; low: bigint } | undefined,
+        workspaceId: string,
+        workspaceTitle: string
+      ) => {
         if (item.node_type === "folder") {
           const groupId = item.id || `group-${randomUUID()}`;
           const groupTitle = item.title || "Tab Group";
@@ -112,7 +161,7 @@ export function serializeToChromiumSession(
 
           if (item.children) {
             for (const child of item.children) {
-              processItem(child, groupInfo);
+              processItem(child, groupInfo, workspaceId, workspaceTitle);
             }
           }
           return;
@@ -141,8 +190,8 @@ export function serializeToChromiumSession(
                   splitIndex,
                   splitHigh,
                   splitLow,
-                  workspaceId: wsId,
-                  workspaceTitle: wsTitle,
+                  workspaceId,
+                  workspaceTitle,
                 });
               }
             });
@@ -162,19 +211,26 @@ export function serializeToChromiumSession(
             groupTitle: parentGroup?.title,
             groupHigh: parentGroup?.high,
             groupLow: parentGroup?.low,
-            workspaceId: wsId,
-            workspaceTitle: wsTitle,
+            workspaceId,
+            workspaceTitle,
           });
         }
       };
 
-      for (const item of wsNode.children) {
-        processItem(item);
+      for (const [workspaceIndex, workspace] of window.workspaces.entries()) {
+        const wsId = workspace.id || `ws-${windowIndex + 1}-${workspaceIndex + 1}`;
+        const wsTitle = workspace.title || `Workspace ${workspaceIndex + 1}`;
+        if (!vivaldiWorkspacesList.some((entry) => entry.id === wsId)) {
+          vivaldiWorkspacesList.push({ id: wsId, name: wsTitle });
+        }
+        for (const item of workspace.node.children || []) {
+          processItem(item, undefined, wsId, wsTitle);
+        }
       }
     });
 
     if (flatTabs.length === 0) {
-      return { success: false, spacesCount: workspaces.length, tabsCount: 0, error: "No valid HTTP tabs found to restore" };
+      return { success: false, spacesCount: workspaceCount, tabsCount: 0, error: "No valid HTTP tabs found to restore" };
     }
 
     // Build SNSS Binary Commands
@@ -327,7 +383,7 @@ export function serializeToChromiumSession(
 
     return {
       success: true,
-      spacesCount: workspaces.length,
+      spacesCount: workspaceCount,
       tabsCount: flatTabs.length,
     };
   } catch (err: any) {

@@ -54,12 +54,10 @@ export function RestoreSessionModal({
     const injectable = installedBrowsers.find((b) => b.supportsOfflineInjection);
     if (injectable) return injectable.id;
 
-    const firstNonDefault = installedBrowsers.find((b) => b.id !== "default");
-    return firstNonDefault ? firstNonDefault.id : "arc";
+    return "";
   }, [sourceBrowserName, installedBrowsers]);
 
   const [selectedTarget, setSelectedTarget] = useState<string>(defaultTarget);
-  const [restoreMode, setRestoreMode] = useState<"merge" | "overwrite">("merge");
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [resultStatus, setResultStatus] = useState<RestoreSessionResult | null>(null);
 
@@ -76,8 +74,8 @@ export function RestoreSessionModal({
 
   const targetInfo = installedBrowsers.find((b) => b.id === selectedTarget) || {
     id: selectedTarget,
-    name: selectedTarget.toUpperCase(),
-    supportsOfflineInjection: ["arc", "zen", "firefox", "chrome", "vivaldi", "brave", "edge"].includes(selectedTarget.toLowerCase()),
+    name: selectedTarget ? selectedTarget.toUpperCase() : "a supported browser",
+    supportsOfflineInjection: false,
   };
 
   const handleExecuteRestore = async () => {
@@ -90,7 +88,7 @@ export function RestoreSessionModal({
         sourceBrowser: sourceBrowserName,
         targetBrowser: selectedTarget,
         tree: trees,
-        mode: restoreMode,
+        mode: "overwrite",
       });
       setResultStatus(res);
     } catch (err: any) {
@@ -186,11 +184,13 @@ export function RestoreSessionModal({
                   return (
                     <div
                       key={b.id}
-                      onClick={() => !isProcessing && setSelectedTarget(b.id)}
-                      className={`p-2.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                      onClick={() => isInjectable && !isProcessing && setSelectedTarget(b.id)}
+                      className={`p-2.5 rounded-xl border transition-all flex items-center justify-between ${
                         isSelected
                           ? "border-cyan-500 bg-cyan-50/50 dark:bg-cyan-950/40 shadow-xs ring-1 ring-cyan-500/30"
-                          : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                          : isInjectable
+                            ? "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                            : "border-slate-200 dark:border-slate-800 opacity-55 cursor-not-allowed"
                       }`}
                     >
                       <div className="flex items-center space-x-2 truncate">
@@ -201,7 +201,12 @@ export function RestoreSessionModal({
                       </div>
                       {isInjectable && (
                         <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 shrink-0">
-                          Native
+                          Experimental native
+                        </span>
+                      )}
+                      {!isInjectable && (
+                        <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 shrink-0">
+                          Tab launch only
                         </span>
                       )}
                     </div>
@@ -210,46 +215,8 @@ export function RestoreSessionModal({
             </div>
           </div>
 
-          {/* Restoration Mode Selection */}
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
-              Restoration Mode:
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <div
-                onClick={() => !isProcessing && setRestoreMode("merge")}
-                className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
-                  restoreMode === "merge"
-                    ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/40 shadow-xs ring-1 ring-indigo-500/30"
-                    : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                }`}
-              >
-                <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-                  <span>Merge with Existing</span>
-                  {restoreMode === "merge" && <span className="text-indigo-600 dark:text-indigo-400">✓</span>}
-                </div>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Preserves current spaces & appends restored items
-                </p>
-              </div>
-
-              <div
-                onClick={() => !isProcessing && setRestoreMode("overwrite")}
-                className={`p-2.5 rounded-xl border cursor-pointer transition-all ${
-                  restoreMode === "overwrite"
-                    ? "border-amber-500 bg-amber-50/50 dark:bg-amber-950/40 shadow-xs ring-1 ring-amber-500/30"
-                    : "border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60"
-                }`}
-              >
-                <div className="text-xs font-bold text-slate-900 dark:text-slate-100 flex items-center justify-between">
-                  <span>Replace Active Session</span>
-                  {restoreMode === "overwrite" && <span className="text-amber-600 dark:text-amber-400">✓</span>}
-                </div>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Overwrites active session with restored snapshot
-                </p>
-              </div>
-            </div>
+          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300">
+            This experimental restore writes the complete selected browser card into {targetInfo.name}'s primary local profile. Existing session state in that profile is replaced; other local profiles are unchanged.
           </div>
 
           {/* Safety & Workflow Notice */}
@@ -308,7 +275,7 @@ export function RestoreSessionModal({
           {!resultStatus?.success && (
             <button
               onClick={handleExecuteRestore}
-              disabled={isProcessing}
+              disabled={isProcessing || !targetInfo.supportsOfflineInjection}
               className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 disabled:opacity-50 text-white text-xs font-bold shadow-sm shadow-indigo-500/20 transition-all active:scale-95 cursor-pointer"
             >
               {isProcessing ? (
@@ -319,7 +286,7 @@ export function RestoreSessionModal({
               ) : (
                 <>
                   <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
-                  <span>Quit & Restore to {targetInfo.name}</span>
+                  <span>{targetInfo.supportsOfflineInjection ? `Quit & Restore to ${targetInfo.name}` : "No validated local browser"}</span>
                 </>
               )}
             </button>

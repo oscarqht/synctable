@@ -15,9 +15,11 @@ import {
   killBrowserProcess,
   backupBrowserSession,
   relaunchBrowser,
+  restoreBrowserSessionBackup,
+  waitForBrowserLaunch,
   KNOWN_BROWSERS,
 } from "./processManager";
-import { serializeAndInjectSession } from "./serializers";
+import { commitStagedSession, discardStagedSession, getTargetBrowserStatePaths, stageSessionInjection, type StagedSessionRestore } from "./serializers";
 
 const db = new SyncTableDB();
 const syncManager = new BrowserSyncManager(db);
@@ -143,12 +145,49 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
         }
       },
       restoreBrowserSession: async ({ sourceBrowser, targetBrowser, tree, mode }) => {
+        let staged: StagedSessionRestore | null = null;
+        let backupPath: string | null = null;
+        let profileName: string | undefined;
+        let committed = false;
         try {
           console.log(`[RestoreSession] Starting restoration: source=${sourceBrowser}, target=${targetBrowser}, mode=${mode}, nodes=${tree?.length || 0}`);
 
+          const browser = KNOWN_BROWSERS.find((candidate) => candidate.id === targetBrowser.toLowerCase());
+          if (!browser?.supportsOfflineInjection) {
+            return {
+              success: false,
+              stats: { workspaces: 0, folders: 0, splitViews: 0, tabs: 0 },
+              error: `${targetBrowser} is not yet validated for offline session injection. Please use Tab Launch restoration.`,
+            };
+          }
+
+          const targetState = getTargetBrowserStatePaths(targetBrowser);
+          if (!targetState) {
+            return {
+              success: false,
+              stats: { workspaces: 0, folders: 0, splitViews: 0, tabs: 0 },
+              error: `No usable local profile was found for ${browser.name}.`,
+            };
+          }
+          profileName = targetState.profileName;
+
+          // Build and validate all state before touching a running browser.
+          const stagedResult = stageSessionInjection(tree, { targetBrowser, mode: "overwrite" });
+          if (!stagedResult.success) {
+            return { success: false, stats: stagedResult.stats, error: stagedResult.error };
+          }
+          staged = stagedResult.staged;
+
           // 1. Create safety backup first
-          const backupPath = await backupBrowserSession(targetBrowser);
+          backupPath = await backupBrowserSession(targetBrowser, profileName);
           console.log(`[RestoreSession] Backup created at: ${backupPath || "none"}`);
+          if (!backupPath) {
+            return {
+              success: false,
+              stats: staged.stats,
+              error: `SyncTable could not back up ${browser.name}'s local session, so no changes were made.`,
+            };
+          }
 
           // 2. Kill target browser process if running
           const isRunning = await isBrowserRunning(targetBrowser);
@@ -165,37 +204,40 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
             }
           }
 
-          // 3. Serialize and inject native files
-          const result = serializeAndInjectSession(tree, {
-            targetBrowser,
-            mode: mode || "merge",
-          });
-
-          if (!result.success) {
-            return {
-              success: false,
-              backupPath: backupPath || undefined,
-              stats: result.stats,
-              error: result.error || "Failed to inject session files",
-            };
-          }
+          // 3. Atomically replace the validated staged state.
+          commitStagedSession(staged);
+          committed = true;
 
           // 4. Relaunch target browser
           console.log(`[RestoreSession] Injection succeeded. Relaunching ${targetBrowser}...`);
           await relaunchBrowser(targetBrowser);
+          if (!(await waitForBrowserLaunch(targetBrowser))) {
+            await restoreBrowserSessionBackup(targetBrowser, backupPath, profileName);
+            await relaunchBrowser(targetBrowser);
+            return {
+              success: false,
+              backupPath,
+              stats: staged.stats,
+              error: `${browser.name} did not relaunch after restore. Its backed-up session was restored.`,
+            };
+          }
 
           return {
             success: true,
-            backupPath: backupPath || undefined,
-            stats: result.stats,
+            backupPath,
+            stats: staged.stats,
           };
         } catch (err: any) {
           console.error("[RestoreSession] Error:", err);
+          if (committed && backupPath) await restoreBrowserSessionBackup(targetBrowser, backupPath, profileName);
           return {
             success: false,
+            backupPath: backupPath || undefined,
             stats: { workspaces: 0, folders: 0, splitViews: 0, tabs: 0 },
             error: err?.message || String(err),
           };
+        } finally {
+          if (staged) discardStagedSession(staged);
         }
       },
     },
