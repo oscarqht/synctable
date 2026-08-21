@@ -9,6 +9,8 @@ export interface ZenSplitViewItemProps {
   node: BrowserTreeNode;
   isCompact?: boolean;
   isDarkTheme?: boolean;
+  isSingleColumn?: boolean;
+  alwaysShowActions?: boolean;
   onSelectTab?: (tab: BrowserTreeNode) => void;
   onOpenExternal?: (url: string) => void;
 }
@@ -17,6 +19,8 @@ export function ZenSplitViewItem({
   node,
   isCompact = false,
   isDarkTheme = false,
+  isSingleColumn = false,
+  alwaysShowActions = false,
   onSelectTab,
   onOpenExternal,
 }: ZenSplitViewItemProps) {
@@ -148,7 +152,13 @@ export function ZenSplitViewItem({
                   </span>
 
                   {tab.url && (
-                    <div className="hidden group-hover/pane:flex items-center gap-0.5 shrink-0">
+                    <div
+                      className={`${
+                        isSingleColumn || alwaysShowActions
+                          ? "flex"
+                          : "flex md:hidden md:group-hover/pane:flex"
+                      } items-center gap-0.5 shrink-0`}
+                    >
                       <button
                         onClick={(e) => handleCopyUrl(e, tab)}
                         title="Copy URL"

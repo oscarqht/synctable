@@ -18,6 +18,8 @@ export interface ZenSidebarViewProps {
   workspaceItem?: WorkspaceItem;
   rootNode?: BrowserTreeNode;
   searchQuery?: string;
+  isSingleColumn?: boolean;
+  alwaysShowActions?: boolean;
   onOpenExternal?: (url: string) => void;
 }
 
@@ -25,6 +27,8 @@ export function ZenSidebarView({
   workspaceItem,
   rootNode: rawRootNode,
   searchQuery: externalSearch = "",
+  isSingleColumn = false,
+  alwaysShowActions = false,
   onOpenExternal,
 }: ZenSidebarViewProps) {
   const [internalSearch, setInternalSearch] = useState("");
@@ -112,6 +116,8 @@ export function ZenSidebarView({
           folder={item}
           activeTabId={activeTabId}
           isDarkTheme={isDark}
+          isSingleColumn={isSingleColumn}
+          alwaysShowActions={alwaysShowActions}
           onSelectTab={handleSelectTab}
           onOpenExternal={onOpenExternal}
         />
@@ -124,6 +130,8 @@ export function ZenSidebarView({
           key={item.id || `split_${idx}`}
           node={item}
           isDarkTheme={isDark}
+          isSingleColumn={isSingleColumn}
+          alwaysShowActions={alwaysShowActions}
           onSelectTab={handleSelectTab}
           onOpenExternal={onOpenExternal}
         />
@@ -137,6 +145,8 @@ export function ZenSidebarView({
         isPinned={item.node_type === "pinned_tab"}
         isActive={activeTabId === item.id}
         isDarkTheme={isDark}
+        isSingleColumn={isSingleColumn}
+        alwaysShowActions={alwaysShowActions}
         onSelect={handleSelectTab}
         onOpenExternal={onOpenExternal}
       />

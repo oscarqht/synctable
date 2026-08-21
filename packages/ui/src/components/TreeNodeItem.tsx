@@ -27,6 +27,8 @@ export interface TreeNodeItemProps {
   browserFilter?: string;
   nodeTypeFilter?: string;
   defaultExpanded?: boolean;
+  isSingleColumn?: boolean;
+  alwaysShowActions?: boolean;
   onOpenExternal?: (url: string) => void;
 }
 
@@ -157,6 +159,8 @@ export function TreeNodeItem({
   browserFilter = "all",
   nodeTypeFilter = "all",
   defaultExpanded = true,
+  isSingleColumn = false,
+  alwaysShowActions = false,
   onOpenExternal,
 }: TreeNodeItemProps) {
   const [expanded, setExpanded] = useState<boolean>(defaultExpanded);
@@ -206,7 +210,12 @@ export function TreeNodeItem({
   if (node.node_type === "split_view") {
     return (
       <div style={{ paddingLeft: `${Math.max(depth * 16 + 4, 4)}px` }}>
-        <ZenSplitViewItem node={node} onOpenExternal={onOpenExternal} />
+        <ZenSplitViewItem
+          node={node}
+          isSingleColumn={isSingleColumn}
+          alwaysShowActions={alwaysShowActions}
+          onOpenExternal={onOpenExternal}
+        />
       </div>
     );
   }
@@ -390,7 +399,13 @@ export function TreeNodeItem({
 
         {/* Actions for Tab Nodes */}
         {node.url && (
-          <div className="hidden group-hover/node:flex items-center gap-1 shrink-0 ml-2 -my-1">
+          <div
+            className={`${
+              isSingleColumn || alwaysShowActions
+                ? "flex"
+                : "flex md:hidden md:group-hover/node:flex"
+            } items-center gap-1 shrink-0 ml-2 -my-1`}
+          >
             <button
               onClick={handleCopyUrl}
               title="Copy URL"
@@ -433,6 +448,8 @@ export function TreeNodeItem({
                 browserFilter={browserFilter}
                 nodeTypeFilter={nodeTypeFilter}
                 defaultExpanded={defaultExpanded}
+                isSingleColumn={isSingleColumn}
+                alwaysShowActions={alwaysShowActions}
                 onOpenExternal={onOpenExternal}
               />
             ))}

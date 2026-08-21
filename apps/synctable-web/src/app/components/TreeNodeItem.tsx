@@ -28,6 +28,9 @@ interface TreeNodeItemProps {
   browserFilter?: string;
   nodeTypeFilter?: string;
   defaultExpanded?: boolean;
+  isSingleColumn?: boolean;
+  alwaysShowActions?: boolean;
+  onOpenExternal?: (url: string) => void;
 }
 
 function getNodeBadge(nodeType: NodeType) {
@@ -151,6 +154,9 @@ export function TreeNodeItem({
   browserFilter = "all",
   nodeTypeFilter = "all",
   defaultExpanded = true,
+  isSingleColumn = false,
+  alwaysShowActions = false,
+  onOpenExternal,
 }: TreeNodeItemProps) {
   const [expanded, setExpanded] = useState<boolean>(defaultExpanded);
   const [copied, setCopied] = useState(false);
@@ -199,7 +205,12 @@ export function TreeNodeItem({
   if (node.node_type === "split_view") {
     return (
       <div style={{ paddingLeft: `${Math.max(depth * 16 + 4, 4)}px` }}>
-        <ZenSplitViewItem node={node} />
+        <ZenSplitViewItem
+          node={node}
+          isSingleColumn={isSingleColumn}
+          alwaysShowActions={alwaysShowActions}
+          onOpenExternal={onOpenExternal}
+        />
       </div>
     );
   }
@@ -362,7 +373,13 @@ export function TreeNodeItem({
 
         {/* Actions for Tab Nodes */}
         {node.url && (
-          <div className="hidden group-hover/node:flex items-center gap-1 shrink-0 ml-2 -my-1">
+          <div
+            className={`${
+              isSingleColumn || alwaysShowActions
+                ? "flex"
+                : "flex md:hidden md:group-hover/node:flex"
+            } items-center gap-1 shrink-0 ml-2 -my-1`}
+          >
             <button
               onClick={handleCopyUrl}
               title="Copy URL"
@@ -378,7 +395,13 @@ export function TreeNodeItem({
               href={node.url}
               target="_blank"
               rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onOpenExternal && node.url) {
+                  e.preventDefault();
+                  onOpenExternal(node.url);
+                }
+              }}
               title="Open tab in new window"
               className="w-5 h-5 flex items-center justify-center rounded-md text-slate-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-slate-800 border border-transparent hover:border-indigo-200 transition-all"
             >
@@ -402,6 +425,9 @@ export function TreeNodeItem({
                 browserFilter={browserFilter}
                 nodeTypeFilter={nodeTypeFilter}
                 defaultExpanded={defaultExpanded}
+                isSingleColumn={isSingleColumn}
+                alwaysShowActions={alwaysShowActions}
+                onOpenExternal={onOpenExternal}
               />
             ))}
         </div>

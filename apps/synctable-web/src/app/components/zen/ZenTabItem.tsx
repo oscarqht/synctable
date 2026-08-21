@@ -11,7 +11,10 @@ interface ZenTabItemProps {
   isCompact?: boolean;
   isActive?: boolean;
   isDarkTheme?: boolean;
+  isSingleColumn?: boolean;
+  alwaysShowActions?: boolean;
   onSelect?: (tab: BrowserTreeNode) => void;
+  onOpenExternal?: (url: string) => void;
 }
 
 export function getDomain(urlStr: string | null): string {
@@ -40,7 +43,10 @@ export function ZenTabItem({
   isCompact = false,
   isActive = false,
   isDarkTheme = false,
+  isSingleColumn = false,
+  alwaysShowActions = false,
   onSelect,
+  onOpenExternal,
 }: ZenTabItemProps) {
   const [copied, setCopied] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -127,9 +133,15 @@ export function ZenTabItem({
         </span>
       </div>
 
-      {/* Hover Action Buttons */}
+      {/* Action Buttons */}
       {tab.url && (
-        <div className="hidden group-hover/tab:flex items-center gap-1 shrink-0 -my-1">
+        <div
+          className={`${
+            isSingleColumn || alwaysShowActions
+              ? "flex"
+              : "flex md:hidden md:group-hover/tab:flex"
+          } items-center gap-1 shrink-0 -my-1`}
+        >
           <button
             onClick={handleCopyUrl}
             title="Copy URL"
@@ -150,7 +162,13 @@ export function ZenTabItem({
             href={tab.url}
             target="_blank"
             rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenExternal && tab.url) {
+                e.preventDefault();
+                onOpenExternal(tab.url);
+              }
+            }}
             title="Open URL in new window"
             className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
               isDarkTheme

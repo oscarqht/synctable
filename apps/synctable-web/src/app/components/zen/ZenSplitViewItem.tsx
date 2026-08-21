@@ -10,14 +10,20 @@ interface ZenSplitViewItemProps {
   node: BrowserTreeNode;
   isCompact?: boolean;
   isDarkTheme?: boolean;
+  isSingleColumn?: boolean;
+  alwaysShowActions?: boolean;
   onSelectTab?: (tab: BrowserTreeNode) => void;
+  onOpenExternal?: (url: string) => void;
 }
 
 export function ZenSplitViewItem({
   node,
   isCompact = false,
   isDarkTheme = false,
+  isSingleColumn = false,
+  alwaysShowActions = false,
   onSelectTab,
+  onOpenExternal,
 }: ZenSplitViewItemProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const children = (node.children || []).filter((c) => isValidHttpUrl(c.url));
@@ -135,7 +141,13 @@ export function ZenSplitViewItem({
                   </span>
 
                   {tab.url && (
-                    <div className="hidden group-hover/pane:flex items-center gap-0.5 shrink-0">
+                    <div
+                      className={`${
+                        isSingleColumn || alwaysShowActions
+                          ? "flex"
+                          : "flex md:hidden md:group-hover/pane:flex"
+                      } items-center gap-0.5 shrink-0`}
+                    >
                       <button
                         onClick={(e) => handleCopyUrl(e, tab)}
                         title="Copy URL"
@@ -151,7 +163,13 @@ export function ZenSplitViewItem({
                         href={tab.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onOpenExternal && tab.url) {
+                            e.preventDefault();
+                            onOpenExternal(tab.url);
+                          }
+                        }}
                         title="Open pane URL"
                         className="w-4 h-4 flex items-center justify-center rounded text-slate-400 hover:text-indigo-600 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
                       >

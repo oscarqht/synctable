@@ -14,7 +14,10 @@ interface ZenFolderItemProps {
   activeTabId?: string | null;
   defaultExpanded?: boolean;
   isDarkTheme?: boolean;
+  isSingleColumn?: boolean;
+  alwaysShowActions?: boolean;
   onSelectTab?: (tab: BrowserTreeNode) => void;
+  onOpenExternal?: (url: string) => void;
 }
 
 export function ZenFolderItem({
@@ -24,7 +27,10 @@ export function ZenFolderItem({
   activeTabId,
   defaultExpanded = true,
   isDarkTheme = false,
+  isSingleColumn = false,
+  alwaysShowActions = false,
   onSelectTab,
+  onOpenExternal,
 }: ZenFolderItemProps) {
   const [isOpen, setIsOpen] = useState<boolean>(defaultExpanded);
   const children = (folder.children || []).filter((c) => countTabs(c) > 0);
@@ -87,7 +93,10 @@ export function ZenFolderItem({
                   activeTabId={activeTabId}
                   defaultExpanded={defaultExpanded}
                   isDarkTheme={isDarkTheme}
+                  isSingleColumn={isSingleColumn}
+                  alwaysShowActions={alwaysShowActions}
                   onSelectTab={onSelectTab}
+                  onOpenExternal={onOpenExternal}
                 />
               );
             }
@@ -98,7 +107,10 @@ export function ZenFolderItem({
                   node={child}
                   isCompact={isCompact}
                   isDarkTheme={isDarkTheme}
+                  isSingleColumn={isSingleColumn}
+                  alwaysShowActions={alwaysShowActions}
                   onSelectTab={onSelectTab}
+                  onOpenExternal={onOpenExternal}
                 />
               );
             }
@@ -110,7 +122,10 @@ export function ZenFolderItem({
                 isCompact={isCompact}
                 isActive={activeTabId === child.id}
                 isDarkTheme={isDarkTheme}
+                isSingleColumn={isSingleColumn}
+                alwaysShowActions={alwaysShowActions}
                 onSelect={onSelectTab}
+                onOpenExternal={onOpenExternal}
               />
             );
           })}

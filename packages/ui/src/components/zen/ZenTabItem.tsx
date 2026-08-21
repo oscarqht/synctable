@@ -11,6 +11,8 @@ export interface ZenTabItemProps {
   isCompact?: boolean;
   isActive?: boolean;
   isDarkTheme?: boolean;
+  isSingleColumn?: boolean;
+  alwaysShowActions?: boolean;
   onSelect?: (tab: BrowserTreeNode) => void;
   onOpenExternal?: (url: string) => void;
 }
@@ -21,6 +23,8 @@ export function ZenTabItem({
   isCompact = false,
   isActive = false,
   isDarkTheme = false,
+  isSingleColumn = false,
+  alwaysShowActions = false,
   onSelect,
   onOpenExternal,
 }: ZenTabItemProps) {
@@ -125,9 +129,15 @@ export function ZenTabItem({
         </span>
       </div>
 
-      {/* Hover Action Buttons */}
+      {/* Action Buttons */}
       {tab.url && (
-        <div className="hidden group-hover/tab:flex items-center gap-1 shrink-0 -my-1">
+        <div
+          className={`${
+            isSingleColumn || alwaysShowActions
+              ? "flex"
+              : "flex md:hidden md:group-hover/tab:flex"
+          } items-center gap-1 shrink-0 -my-1`}
+        >
           <button
             onClick={handleCopyUrl}
             title="Copy URL"

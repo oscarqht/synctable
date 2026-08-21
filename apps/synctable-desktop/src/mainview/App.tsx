@@ -177,7 +177,7 @@ export function App({ rpc }: AppProps) {
           <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-xs">
             🔄
           </div>
-          <div className="flex items-baseline space-x-1.5">
+          <div className="hidden min-[720px]:flex items-baseline space-x-1.5">
             <span className="text-xs font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
               SyncTable
             </span>
@@ -228,7 +228,7 @@ export function App({ rpc }: AppProps) {
           className="flex items-center space-x-2 electrobun-webkit-app-region-no-drag titlebar-no-drag"
         >
           {user && (
-            <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300">
+            <div className="hidden min-[720px]:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300">
               {user.avatarUrl ? (
                 <img
                   src={user.avatarUrl}
