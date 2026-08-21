@@ -174,8 +174,8 @@ export function App({ rpc }: AppProps) {
       >
         {/* Left: Brand with spacing for macOS traffic light buttons */}
         <div className="flex items-center space-x-2.5 pl-20">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shadow-xs">
-            🔄
+          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white dark:from-slate-800 dark:via-slate-800/60 dark:to-slate-900 border border-sky-200/60 dark:border-slate-700/60 flex items-center justify-center shadow-xs text-sm select-none">
+            🍕
           </div>
           <div className="hidden min-[720px]:flex items-baseline space-x-1.5">
             <span className="text-xs font-extrabold tracking-tight text-slate-900 dark:text-slate-100">

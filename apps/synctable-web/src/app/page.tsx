@@ -271,7 +271,7 @@ export default function Home() {
           {/* Logo */}
           <div className="flex items-center space-x-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white border border-sky-200/60 flex items-center justify-center shadow-xs text-lg select-none">
-              🔄
+              🍕
             </div>
             <div className="flex flex-col sm:block justify-center">
               <div className="font-bold text-base tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 bg-clip-text text-transparent flex items-center gap-2">
