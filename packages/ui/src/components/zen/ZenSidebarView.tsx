@@ -10,6 +10,7 @@ import {
   isDarkColor,
   getWorkspaceGradientStyle,
 } from "../../utils/treeUtils";
+import { extractValidUrls } from "../../utils/treeUtils";
 import { ZenFolderItem } from "./ZenFolderItem";
 import { ZenSplitViewItem } from "./ZenSplitViewItem";
 import { ZenTabItem } from "./ZenTabItem";
@@ -19,6 +20,7 @@ export interface ZenSidebarViewProps {
   rootNode?: BrowserTreeNode;
   searchQuery?: string;
   onOpenExternal?: (url: string) => void;
+  onOpenTabs?: (urls: string[], browserId?: string) => void;
 }
 
 export function ZenSidebarView({
@@ -26,6 +28,7 @@ export function ZenSidebarView({
   rootNode: rawRootNode,
   searchQuery: externalSearch = "",
   onOpenExternal,
+  onOpenTabs,
 }: ZenSidebarViewProps) {
   const [internalSearch, setInternalSearch] = useState("");
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -114,6 +117,7 @@ export function ZenSidebarView({
           isDarkTheme={isDark}
           onSelectTab={handleSelectTab}
           onOpenExternal={onOpenExternal}
+          onOpenTabs={onOpenTabs}
         />
       );
     }
@@ -126,6 +130,7 @@ export function ZenSidebarView({
           isDarkTheme={isDark}
           onSelectTab={handleSelectTab}
           onOpenExternal={onOpenExternal}
+          onOpenTabs={onOpenTabs}
         />
       );
     }
@@ -161,6 +166,13 @@ export function ZenSidebarView({
     currentWorkspaceItem.themeColor,
     isDark
   );
+
+  const handleOpenAllWorkspaceTabs = () => {
+    if (onOpenTabs && workspaceNode) {
+      const urls = extractValidUrls(workspaceNode);
+      onOpenTabs(urls);
+    }
+  };
 
   return (
     <div
@@ -201,17 +213,35 @@ export function ZenSidebarView({
             </span>
           )}
         </div>
-        <span
-          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-            isDark
-              ? "text-white/90 bg-white/20 border border-white/20"
-              : hasThemeBg
-              ? "text-slate-700 dark:text-slate-200 bg-white/50 dark:bg-black/20 border border-white/40 dark:border-white/10 shadow-xs"
-              : "text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800/60"
-          }`}
-        >
-          {tabCount} {tabCount === 1 ? "tab" : "tabs"}
-        </span>
+        <div className="flex items-center space-x-1.5 shrink-0">
+          {onOpenTabs && (
+            <button
+              onClick={handleOpenAllWorkspaceTabs}
+              title={`Open all ${tabCount} tabs in browser`}
+              className={`p-1 rounded-lg text-[10px] font-semibold flex items-center space-x-1 transition-all active:scale-95 cursor-pointer ${
+                isDark
+                  ? "text-white/80 hover:text-white bg-white/15 hover:bg-white/25"
+                  : hasThemeBg
+                  ? "text-slate-700 dark:text-slate-200 bg-white/40 dark:bg-black/20 hover:bg-white/60"
+                  : "text-slate-600 dark:text-slate-300 bg-slate-200/60 dark:bg-slate-800/60 hover:bg-slate-200"
+              }`}
+            >
+              <span>🌐</span>
+              <span className="text-[9px]">Open</span>
+            </button>
+          )}
+          <span
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+              isDark
+                ? "text-white/90 bg-white/20 border border-white/20"
+                : hasThemeBg
+                ? "text-slate-700 dark:text-slate-200 bg-white/50 dark:bg-black/20 border border-white/40 dark:border-white/10 shadow-xs"
+                : "text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800/60"
+            }`}
+          >
+            {tabCount} {tabCount === 1 ? "tab" : "tabs"}
+          </span>
+        </div>
       </div>
 
       {/* Search Input */}

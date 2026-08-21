@@ -89,6 +89,34 @@ export interface CloudSyncResponse {
   error?: string;
 }
 
+export interface InstalledBrowser {
+  id: string;
+  name: string;
+  bundleId?: string;
+  appPath?: string;
+  isDefault?: boolean;
+  supportsOfflineInjection?: boolean;
+}
+
+export interface RestoreSessionParams {
+  sourceBrowser: string;
+  targetBrowser: string;
+  tree: BrowserTreeNode[];
+  mode: "merge" | "overwrite";
+}
+
+export interface RestoreSessionResult {
+  success: boolean;
+  backupPath?: string;
+  stats: {
+    workspaces: number;
+    folders: number;
+    splitViews: number;
+    tabs: number;
+  };
+  error?: string;
+}
+
 export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
   bun: {
     requests: {
@@ -131,6 +159,18 @@ export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
       openExternalURL: {
         params: { url: string };
         response: void;
+      };
+      getInstalledBrowsers: {
+        params: void;
+        response: InstalledBrowser[];
+      };
+      openTabsInBrowser: {
+        params: { browserId?: string; urls: string[] };
+        response: { success: boolean; count: number; error?: string };
+      };
+      restoreBrowserSession: {
+        params: RestoreSessionParams;
+        response: RestoreSessionResult;
       };
     };
     messages: {

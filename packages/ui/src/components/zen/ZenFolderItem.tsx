@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import type { BrowserTreeNode } from "../../types";
-import { countTabs } from "../../utils/treeUtils";
+import { countTabs, extractValidUrls } from "../../utils/treeUtils";
 import { ZenFolderIcon } from "./ZenFolderIcon";
 import { ZenTabItem } from "./ZenTabItem";
 import { ZenSplitViewItem } from "./ZenSplitViewItem";
@@ -16,6 +16,7 @@ export interface ZenFolderItemProps {
   isDarkTheme?: boolean;
   onSelectTab?: (tab: BrowserTreeNode) => void;
   onOpenExternal?: (url: string) => void;
+  onOpenTabs?: (urls: string[], browserId?: string) => void;
 }
 
 export function ZenFolderItem({
@@ -27,6 +28,7 @@ export function ZenFolderItem({
   isDarkTheme = false,
   onSelectTab,
   onOpenExternal,
+  onOpenTabs,
 }: ZenFolderItemProps) {
   const [isOpen, setIsOpen] = useState<boolean>(defaultExpanded);
   const children = (folder.children || []).filter((c) => countTabs(c) > 0);
@@ -38,6 +40,14 @@ export function ZenFolderItem({
   if (countTabs(folder) === 0 || children.length === 0) {
     return null;
   }
+
+  const handleOpenFolderTabs = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onOpenTabs) {
+      const urls = extractValidUrls(folder);
+      onOpenTabs(urls);
+    }
+  };
 
   if (isCompact) {
     return (
@@ -58,7 +68,7 @@ export function ZenFolderItem({
       {/* Folder Row */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl cursor-pointer transition-all duration-150 active:scale-[0.99] ${
+        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl cursor-pointer transition-all duration-150 active:scale-[0.99] group/folder-row ${
           isDarkTheme
             ? "hover:bg-white/15 text-white"
             : "hover:bg-white/40 dark:hover:bg-white/10"
@@ -75,6 +85,22 @@ export function ZenFolderItem({
         >
           {folder.title || "Folder"}
         </span>
+
+        {/* Hover quick open action */}
+        {onOpenTabs && (
+          <button
+            onClick={handleOpenFolderTabs}
+            title={`Open all ${countTabs(folder)} tabs in folder`}
+            className={`hidden group-hover/folder-row:flex items-center space-x-1 px-2 py-0.5 rounded-lg text-[10px] font-semibold transition-all active:scale-95 cursor-pointer ${
+              isDarkTheme
+                ? "bg-white/20 hover:bg-white/30 text-white"
+                : "bg-slate-200/80 hover:bg-slate-300/80 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200"
+            }`}
+          >
+            <span>🌐</span>
+            <span>{countTabs(folder)}</span>
+          </button>
+        )}
       </div>
 
       {/* Nested Children Indented */}
@@ -93,6 +119,7 @@ export function ZenFolderItem({
                   isDarkTheme={isDarkTheme}
                   onSelectTab={onSelectTab}
                   onOpenExternal={onOpenExternal}
+                  onOpenTabs={onOpenTabs}
                 />
               );
             }
@@ -105,6 +132,7 @@ export function ZenFolderItem({
                   isDarkTheme={isDarkTheme}
                   onSelectTab={onSelectTab}
                   onOpenExternal={onOpenExternal}
+                  onOpenTabs={onOpenTabs}
                 />
               );
             }

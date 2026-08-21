@@ -9,6 +9,16 @@ import { BrowserSyncManager } from "./sync";
 import type { CloudSyncResponse, SyncTableRPCSchema } from "../shared/types";
 
 
+import {
+  getInstalledBrowsers,
+  isBrowserRunning,
+  killBrowserProcess,
+  backupBrowserSession,
+  relaunchBrowser,
+  KNOWN_BROWSERS,
+} from "./processManager";
+import { serializeAndInjectSession } from "./serializers";
+
 const db = new SyncTableDB();
 const syncManager = new BrowserSyncManager(db);
 const DEFAULT_WINDOW_FRAME = { x: 120, y: 80, width: 1150, height: 780 };
@@ -98,6 +108,94 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
           if (platform() === "darwin") {
             Bun.spawn(["open", url]);
           }
+        }
+      },
+      getInstalledBrowsers: async () => {
+        return await getInstalledBrowsers();
+      },
+      openTabsInBrowser: async ({ browserId, urls }) => {
+        if (!urls || urls.length === 0) return { success: false, count: 0, error: "No URLs provided" };
+        const validUrls = urls.filter((u) => u && (u.startsWith("http://") || u.startsWith("https://")));
+        if (validUrls.length === 0) return { success: false, count: 0, error: "No valid HTTP URLs" };
+
+        try {
+          if (!browserId || browserId === "default") {
+            if (platform() === "darwin") {
+              Bun.spawn(["open", ...validUrls]);
+            } else {
+              for (const u of validUrls) Utils.openExternal(u);
+            }
+          } else {
+            const kb = KNOWN_BROWSERS.find((k) => k.id === browserId.toLowerCase());
+            if (platform() === "darwin") {
+              if (kb) {
+                Bun.spawn(["open", "-b", kb.bundleId, ...validUrls]);
+              } else {
+                Bun.spawn(["open", "-a", browserId, ...validUrls]);
+              }
+            } else {
+              for (const u of validUrls) Utils.openExternal(u);
+            }
+          }
+          return { success: true, count: validUrls.length };
+        } catch (err: any) {
+          return { success: false, count: 0, error: err?.message || String(err) };
+        }
+      },
+      restoreBrowserSession: async ({ sourceBrowser, targetBrowser, tree, mode }) => {
+        try {
+          console.log(`[RestoreSession] Starting restoration: source=${sourceBrowser}, target=${targetBrowser}, mode=${mode}, nodes=${tree?.length || 0}`);
+
+          // 1. Create safety backup first
+          const backupPath = await backupBrowserSession(targetBrowser);
+          console.log(`[RestoreSession] Backup created at: ${backupPath || "none"}`);
+
+          // 2. Kill target browser process if running
+          const isRunning = await isBrowserRunning(targetBrowser);
+          if (isRunning) {
+            console.log(`[RestoreSession] Target browser ${targetBrowser} is running. Terminating process...`);
+            const killed = await killBrowserProcess(targetBrowser);
+            if (!killed) {
+              return {
+                success: false,
+                backupPath: backupPath || undefined,
+                stats: { workspaces: 0, folders: 0, splitViews: 0, tabs: 0 },
+                error: `Could not terminate running ${targetBrowser} process. Please quit it manually and try again.`,
+              };
+            }
+          }
+
+          // 3. Serialize and inject native files
+          const result = serializeAndInjectSession(tree, {
+            targetBrowser,
+            mode: mode || "merge",
+          });
+
+          if (!result.success) {
+            return {
+              success: false,
+              backupPath: backupPath || undefined,
+              stats: result.stats,
+              error: result.error || "Failed to inject session files",
+            };
+          }
+
+          // 4. Relaunch target browser
+          console.log(`[RestoreSession] Injection succeeded. Relaunching ${targetBrowser}...`);
+          await relaunchBrowser(targetBrowser);
+
+          return {
+            success: true,
+            backupPath: backupPath || undefined,
+            stats: result.stats,
+          };
+        } catch (err: any) {
+          console.error("[RestoreSession] Error:", err);
+          return {
+            success: false,
+            stats: { workspaces: 0, folders: 0, splitViews: 0, tabs: 0 },
+            error: err?.message || String(err),
+          };
         }
       },
     },

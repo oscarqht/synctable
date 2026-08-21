@@ -13,7 +13,13 @@ import {
   HardDrive,
   Sparkles,
 } from "lucide-react";
-import type { SynctableSyncResponse, BrowserTreeNode } from "../types";
+import type {
+  SynctableSyncResponse,
+  BrowserTreeNode,
+  InstalledBrowser,
+  RestoreSessionParams,
+  RestoreSessionResult,
+} from "../types";
 import {
   countTabs,
   countWorkspaces,
@@ -26,8 +32,11 @@ import { DeviceCard } from "./DeviceCard";
 export interface MultiDeviceCardsPortalProps {
   data: SynctableSyncResponse | null;
   loading?: boolean;
+  installedBrowsers?: InstalledBrowser[];
   onRefresh?: () => void;
   onOpenExternal?: (url: string) => void;
+  onOpenTabs?: (urls: string[], browserId?: string) => Promise<void> | void;
+  onRestoreSession?: (params: RestoreSessionParams) => Promise<RestoreSessionResult>;
   onSaveToken?: (token: string) => Promise<void> | void;
   onSwitchToLocal?: () => void;
 }
@@ -35,8 +44,11 @@ export interface MultiDeviceCardsPortalProps {
 export function MultiDeviceCardsPortal({
   data,
   loading = false,
+  installedBrowsers = [],
   onRefresh,
   onOpenExternal,
+  onOpenTabs,
+  onRestoreSession,
   onSaveToken,
   onSwitchToLocal,
 }: MultiDeviceCardsPortalProps) {
@@ -425,7 +437,10 @@ export function MultiDeviceCardsPortal({
             trees={device.tree}
             selectedBrowser={selectedBrowser}
             searchQuery={searchQuery}
+            installedBrowsers={installedBrowsers}
             onOpenExternal={onOpenExternal}
+            onOpenTabs={onOpenTabs}
+            onRestoreSession={onRestoreSession}
           />
         ))}
       </div>

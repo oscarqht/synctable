@@ -1,15 +1,21 @@
-"use client";
-
-import React, { useMemo } from "react";
-import { Laptop } from "lucide-react";
-import type { BrowserTreeNode } from "../types";
+import React, { useState, useMemo } from "react";
+import { Laptop, Sparkles, Globe } from "lucide-react";
+import type {
+  BrowserTreeNode,
+  InstalledBrowser,
+  RestoreSessionParams,
+  RestoreSessionResult,
+} from "../types";
 import {
   countTabs,
   countWorkspaces,
   extractWorkspacesFromRoot,
+  extractTreeStats,
+  extractValidUrls,
   formatRelativeTime,
 } from "../utils/treeUtils";
 import { ZenSidebarView } from "./zen/ZenSidebarView";
+import { RestoreSessionModal } from "./RestoreSessionModal";
 
 export interface DeviceCardProps {
   deviceName: string;
@@ -19,7 +25,10 @@ export interface DeviceCardProps {
   trees: BrowserTreeNode[];
   selectedBrowser?: string;
   searchQuery?: string;
+  installedBrowsers?: InstalledBrowser[];
   onOpenExternal?: (url: string) => void;
+  onOpenTabs?: (urls: string[], browserId?: string) => Promise<void> | void;
+  onRestoreSession?: (params: RestoreSessionParams) => Promise<RestoreSessionResult>;
   emptyMessage?: string;
 }
 
@@ -31,9 +40,18 @@ export function DeviceCard({
   trees,
   selectedBrowser = "all",
   searchQuery = "",
+  installedBrowsers = [],
   onOpenExternal,
+  onOpenTabs,
+  onRestoreSession,
   emptyMessage,
 }: DeviceCardProps) {
+  const [restoreModalData, setRestoreModalData] = useState<{
+    isOpen: boolean;
+    browserName: string;
+    trees: BrowserTreeNode[];
+  } | null>(null);
+
   const filteredRoots = useMemo(() => {
     return trees.filter((node) => {
       if (countTabs(node) === 0) return false;
@@ -128,18 +146,58 @@ export function DeviceCard({
             {browserGroups.map(([browserName, browserTrees]) => {
               const workspaces = browserTrees.flatMap(extractWorkspacesFromRoot);
               if (workspaces.length === 0) return null;
+              const groupStats = extractTreeStats(browserTrees);
 
               return (
                 <div key={browserName} className="space-y-3">
-                  <div className="flex items-center gap-2 px-1">
-                    <span className="text-xs uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
-                      {browserName}
-                    </span>
-                    <span className="text-[11px] font-medium text-slate-400">
-                      ({workspaces.length}{" "}
-                      {workspaces.length === 1 ? "workspace" : "workspaces"})
-                    </span>
+                  {/* Browser Group Header with Quick Open & Native Restore Buttons */}
+                  <div className="flex items-center justify-between gap-2 px-1 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs uppercase font-bold tracking-wider text-slate-700 dark:text-slate-300">
+                        {browserName}
+                      </span>
+                      <span className="text-[11px] font-medium text-slate-400">
+                        ({workspaces.length}{" "}
+                        {workspaces.length === 1 ? "workspace" : "workspaces"} &middot; {groupStats.tabs} tabs)
+                      </span>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      {/* 1. Quick Open All URLs Button */}
+                      {onOpenTabs && (
+                        <button
+                          onClick={() => {
+                            const urls = extractValidUrls(browserTrees);
+                            onOpenTabs(urls, "default");
+                          }}
+                          className="flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[11px] font-semibold transition-all shadow-2xs active:scale-95 cursor-pointer"
+                          title={`Open all ${groupStats.tabs} tabs in default browser`}
+                        >
+                          <Globe className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                          <span>Open All Tabs ({groupStats.tabs})</span>
+                        </button>
+                      )}
+
+                      {/* 2. Offline Session Injection & Restore Button */}
+                      {onRestoreSession && (
+                        <button
+                          onClick={() => {
+                            setRestoreModalData({
+                              isOpen: true,
+                              browserName,
+                              trees: browserTrees,
+                            });
+                          }}
+                          className="flex items-center space-x-1.5 px-3 py-1 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white text-[11px] font-bold shadow-xs hover:shadow-cyan-500/20 transition-all active:scale-95 cursor-pointer"
+                          title={`Restore full ${browserName} session (spaces, folders, split views, tabs) into local browser`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-cyan-200" />
+                          <span>⚡ Restore to Local...</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
+
                   {/* Arrange each workspace as a separate card in the grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
                     {workspaces.map((wsItem) => (
@@ -148,6 +206,7 @@ export function DeviceCard({
                         workspaceItem={wsItem}
                         searchQuery={searchQuery}
                         onOpenExternal={onOpenExternal}
+                        onOpenTabs={onOpenTabs}
                       />
                     ))}
                   </div>
@@ -157,6 +216,21 @@ export function DeviceCard({
           </div>
         )}
       </div>
+
+      {/* Restore Session Modal */}
+      {restoreModalData && (
+        <RestoreSessionModal
+          isOpen={restoreModalData.isOpen}
+          onClose={() => setRestoreModalData(null)}
+          sourceBrowserName={restoreModalData.browserName}
+          sourceDeviceName={deviceName}
+          trees={restoreModalData.trees}
+          installedBrowsers={installedBrowsers}
+          onRestore={onRestoreSession}
+          onOpenTabs={onOpenTabs}
+        />
+      )}
     </div>
   );
 }
+

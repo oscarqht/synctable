@@ -302,3 +302,80 @@ export function extractWorkspacesFromRoot(rawRootNode: BrowserTreeNode): Workspa
 
   return list;
 }
+
+/**
+ * Recursively extracts all valid http/https URLs in tree order.
+ */
+export function extractValidUrls(nodeOrNodes: BrowserTreeNode | BrowserTreeNode[]): string[] {
+  const nodes = Array.isArray(nodeOrNodes) ? nodeOrNodes : [nodeOrNodes];
+  const urls: string[] = [];
+
+  function walk(node: BrowserTreeNode) {
+    if ((node.node_type === "tab" || node.node_type === "pinned_tab") && isValidHttpUrl(node.url)) {
+      urls.push(node.url!);
+    }
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        walk(child);
+      }
+    }
+  }
+
+  for (const n of nodes) {
+    if (n) walk(n);
+  }
+  return urls;
+}
+
+/**
+ * Computes counts of workspaces, folders, split views, and tabs from tree nodes.
+ */
+export function extractTreeStats(nodeOrNodes: BrowserTreeNode | BrowserTreeNode[]): {
+  workspaces: number;
+  folders: number;
+  splitViews: number;
+  tabs: number;
+} {
+  const nodes = Array.isArray(nodeOrNodes) ? nodeOrNodes : [nodeOrNodes];
+  let workspaces = 0;
+  let folders = 0;
+  let splitViews = 0;
+  let tabs = 0;
+
+  function walk(node: BrowserTreeNode) {
+    if (!node) return;
+    if (node.node_type === "workspace") workspaces++;
+    else if (node.node_type === "folder") folders++;
+    else if (node.node_type === "split_view") splitViews++;
+    else if ((node.node_type === "tab" || node.node_type === "pinned_tab") && isValidHttpUrl(node.url)) tabs++;
+
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        walk(child);
+      }
+    }
+  }
+
+  for (const n of nodes) {
+    if (n) {
+      if (n.node_type === "root" || n.node_type === "window") {
+        workspaces += extractWorkspacesFromRoot(n).length;
+        // Walk children
+        if (n.children) {
+          for (const c of n.children) {
+            walk(c);
+          }
+        }
+      } else {
+        walk(n);
+      }
+    }
+  }
+
+  // If root contained workspaces, adjust workspaces count if counted twice
+  if (workspaces === 0 && tabs > 0) {
+    workspaces = 1;
+  }
+
+  return { workspaces, folders, splitViews, tabs };
+}

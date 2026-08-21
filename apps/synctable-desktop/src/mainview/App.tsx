@@ -5,6 +5,9 @@ import type {
   SyncStats,
   SynctableSyncResponse,
   RaindropUserProfile,
+  InstalledBrowser,
+  RestoreSessionParams,
+  RestoreSessionResult,
 } from "@synctable/ui";
 import { MultiDeviceCardsPortal, countTabs } from "@synctable/ui";
 import { LocalTab } from "./LocalTab";
@@ -20,6 +23,7 @@ export function App({ rpc }: AppProps) {
   const [stats, setStats] = useState<SyncStats | null>(null);
   const [trees, setTrees] = useState<BrowserTreeNode[]>([]);
   const [localSyncing, setLocalSyncing] = useState<boolean>(false);
+  const [installedBrowsers, setInstalledBrowsers] = useState<InstalledBrowser[]>([]);
 
   const [cloudData, setCloudData] = useState<SynctableSyncResponse | null>(null);
   const [cloudLoading, setCloudLoading] = useState<boolean>(false);
@@ -37,6 +41,16 @@ export function App({ rpc }: AppProps) {
       setSavedRaindropToken(token || "");
     } catch (err) {
       console.error("Failed to load preferences:", err);
+    }
+  }, [rpc]);
+
+  // Load installed browsers
+  const loadInstalledBrowsers = useCallback(async () => {
+    try {
+      const list = await rpc.request.getInstalledBrowsers();
+      setInstalledBrowsers(list || []);
+    } catch (err) {
+      console.error("Failed to load installed browsers:", err);
     }
   }, [rpc]);
 
@@ -91,6 +105,7 @@ export function App({ rpc }: AppProps) {
   // Initial load and syncComplete listener
   useEffect(() => {
     loadPreferences();
+    loadInstalledBrowsers();
     loadLocalData();
     loadCloudData(true);
 
@@ -106,7 +121,7 @@ export function App({ rpc }: AppProps) {
     return () => {
       window.removeEventListener("synctable:syncComplete", handleSyncEvent);
     };
-  }, [loadPreferences, loadLocalData, loadCloudData]);
+  }, [loadPreferences, loadInstalledBrowsers, loadLocalData, loadCloudData]);
 
 
   // Handle Tab Switch
@@ -140,6 +155,33 @@ export function App({ rpc }: AppProps) {
   // Handle External URL open
   const handleOpenExternal = (url: string) => {
     rpc.request.openExternalURL({ url });
+  };
+
+  // Handle Opening multiple tabs in local browser
+  const handleOpenTabs = async (urls: string[], browserId?: string) => {
+    try {
+      await rpc.request.openTabsInBrowser({ browserId, urls });
+    } catch (err) {
+      console.error("Failed to open tabs in browser:", err);
+    }
+  };
+
+  // Handle Restoring Full Browser Session
+  const handleRestoreSession = async (params: RestoreSessionParams): Promise<RestoreSessionResult> => {
+    try {
+      const res: RestoreSessionResult = await rpc.request.restoreBrowserSession(params);
+      if (res.success) {
+        await loadLocalData();
+      }
+      return res;
+    } catch (err: any) {
+      console.error("Failed to restore browser session:", err);
+      return {
+        success: false,
+        stats: { workspaces: 0, folders: 0, splitViews: 0, tabs: 0 },
+        error: err?.message || String(err),
+      };
+    }
   };
 
   // Handle Save Token from inline form
@@ -270,7 +312,10 @@ export function App({ rpc }: AppProps) {
               trees={trees}
               syncing={localSyncing}
               onSync={handleSyncNow}
+              installedBrowsers={installedBrowsers}
               onOpenExternal={handleOpenExternal}
+              onOpenTabs={handleOpenTabs}
+              onRestoreSession={handleRestoreSession}
               deviceName={savedDeviceName}
             />
           </div>
@@ -279,8 +324,11 @@ export function App({ rpc }: AppProps) {
             <MultiDeviceCardsPortal
               data={cloudData}
               loading={cloudLoading}
+              installedBrowsers={installedBrowsers}
               onRefresh={() => loadCloudData(false)}
               onOpenExternal={handleOpenExternal}
+              onOpenTabs={handleOpenTabs}
+              onRestoreSession={handleRestoreSession}
               onSaveToken={handleSaveToken}
               onSwitchToLocal={() => setActiveTab("local")}
             />

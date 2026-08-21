@@ -7,7 +7,13 @@ import {
   RefreshCw,
   Laptop,
 } from "lucide-react";
-import type { BrowserTreeNode, SyncStats } from "@synctable/ui";
+import type {
+  BrowserTreeNode,
+  SyncStats,
+  InstalledBrowser,
+  RestoreSessionParams,
+  RestoreSessionResult,
+} from "@synctable/ui";
 import {
   DeviceCard,
   countTabs,
@@ -19,7 +25,10 @@ export interface LocalTabProps {
   trees: BrowserTreeNode[];
   syncing: boolean;
   onSync: () => void;
+  installedBrowsers?: InstalledBrowser[];
   onOpenExternal?: (url: string) => void;
+  onOpenTabs?: (urls: string[], browserId?: string) => Promise<void> | void;
+  onRestoreSession?: (params: RestoreSessionParams) => Promise<RestoreSessionResult>;
   deviceName?: string;
 }
 
@@ -28,7 +37,10 @@ export function LocalTab({
   trees,
   syncing,
   onSync,
+  installedBrowsers = [],
   onOpenExternal,
+  onOpenTabs,
+  onRestoreSession,
   deviceName,
 }: LocalTabProps) {
   const [searchQuery, setSearchQuery] = useState<string>("");
@@ -145,7 +157,10 @@ export function LocalTab({
           trees={validTrees}
           selectedBrowser={selectedBrowser}
           searchQuery={searchQuery}
+          installedBrowsers={installedBrowsers}
           onOpenExternal={onOpenExternal}
+          onOpenTabs={onOpenTabs}
+          onRestoreSession={onRestoreSession}
           emptyMessage="No tree snapshots match the current filters on this device."
         />
       )}

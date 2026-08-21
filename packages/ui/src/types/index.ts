@@ -84,3 +84,31 @@ export interface SyncStats {
   browserCounts: Record<string, number>;
   lastSyncTime: string | null;
 }
+
+export interface InstalledBrowser {
+  id: string;
+  name: string;
+  bundleId?: string;
+  appPath?: string;
+  isDefault?: boolean;
+  supportsOfflineInjection?: boolean;
+}
+
+export interface RestoreSessionParams {
+  sourceBrowser: string;
+  targetBrowser: string;
+  tree: BrowserTreeNode[];
+  mode: "merge" | "overwrite";
+}
+
+export interface RestoreSessionResult {
+  success: boolean;
+  backupPath?: string;
+  stats: {
+    workspaces: number;
+    folders: number;
+    splitViews: number;
+    tabs: number;
+  };
+  error?: string;
+}

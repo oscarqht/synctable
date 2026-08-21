@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Columns, ExternalLink, Copy, Check } from "lucide-react";
 import type { BrowserTreeNode } from "../../types";
-import { isValidHttpUrl, countTabs, getDomain, getFaviconUrl } from "../../utils/treeUtils";
+import { isValidHttpUrl, countTabs, getDomain, getFaviconUrl, extractValidUrls } from "../../utils/treeUtils";
 
 export interface ZenSplitViewItemProps {
   node: BrowserTreeNode;
@@ -11,6 +11,7 @@ export interface ZenSplitViewItemProps {
   isDarkTheme?: boolean;
   onSelectTab?: (tab: BrowserTreeNode) => void;
   onOpenExternal?: (url: string) => void;
+  onOpenTabs?: (urls: string[], browserId?: string) => void;
 }
 
 export function ZenSplitViewItem({
@@ -19,6 +20,7 @@ export function ZenSplitViewItem({
   isDarkTheme = false,
   onSelectTab,
   onOpenExternal,
+  onOpenTabs,
 }: ZenSplitViewItemProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const children = (node.children || []).filter((c) => isValidHttpUrl(c.url));
@@ -43,6 +45,14 @@ export function ZenSplitViewItem({
         e.preventDefault();
         onOpenExternal(tab.url);
       }
+    }
+  };
+
+  const handleOpenSplitTabs = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onOpenTabs) {
+      const urls = extractValidUrls(node);
+      onOpenTabs(urls);
     }
   };
 
@@ -97,13 +107,26 @@ export function ZenSplitViewItem({
           <Columns className={`w-3 h-3 ${isDarkTheme ? "text-white" : "text-slate-600 dark:text-slate-300"}`} />
           <span>{node.title || "Split View"}</span>
         </div>
-        <span
-          className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-            isDarkTheme ? "bg-white/20 text-white" : "bg-black/5 dark:bg-white/15 text-slate-700 dark:text-slate-200"
-          }`}
-        >
-          {children.length} panes
-        </span>
+        <div className="flex items-center space-x-1">
+          {onOpenTabs && (
+            <button
+              onClick={handleOpenSplitTabs}
+              title={`Open both split panes in browser`}
+              className={`px-1.5 py-0.2 rounded text-[9px] font-bold transition-all active:scale-95 cursor-pointer ${
+                isDarkTheme ? "bg-white/20 hover:bg-white/30 text-white" : "bg-black/5 hover:bg-black/10 dark:bg-white/15 text-slate-700 dark:text-slate-200"
+              }`}
+            >
+              🌐 Open
+            </button>
+          )}
+          <span
+            className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+              isDarkTheme ? "bg-white/20 text-white" : "bg-black/5 dark:bg-white/15 text-slate-700 dark:text-slate-200"
+            }`}
+          >
+            {children.length} panes
+          </span>
+        </div>
       </div>
 
       {/* Side-by-Side Panes (Zen Segmented Card) */}
