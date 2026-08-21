@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import { Copy, Check, ExternalLink } from "lucide-react";
 import type { BrowserTreeNode } from "../../types";
-import { countTabs } from "../../utils/treeUtils";
+import { countTabs, getAllTabUrls } from "../../utils/treeUtils";
 import { ZenFolderIcon } from "./ZenFolderIcon";
 import { ZenTabItem } from "./ZenTabItem";
 import { ZenSplitViewItem } from "./ZenSplitViewItem";
@@ -33,6 +34,7 @@ export function ZenFolderItem({
   onOpenExternal,
 }: ZenFolderItemProps) {
   const [isOpen, setIsOpen] = useState<boolean>(defaultExpanded);
+  const [copied, setCopied] = useState<boolean>(false);
   const children = (folder.children || []).filter((c) => countTabs(c) > 0);
 
   React.useEffect(() => {
@@ -42,6 +44,32 @@ export function ZenFolderItem({
   if (countTabs(folder) === 0 || children.length === 0) {
     return null;
   }
+
+  const handleCopyFolder = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const urls = getAllTabUrls(folder);
+    if (urls.length > 0) {
+      navigator.clipboard.writeText(urls.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    }
+  };
+
+  const handleOpenFolder = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const urls = getAllTabUrls(folder);
+    if (urls.length > 0) {
+      if (onOpenExternal) {
+        urls.forEach((url) => onOpenExternal(url));
+      } else {
+        urls.forEach((url) => {
+          window.open(url, "_blank", "noopener,noreferrer");
+        });
+      }
+    }
+  };
 
   if (isCompact) {
     return (
@@ -79,6 +107,42 @@ export function ZenFolderItem({
         >
           {folder.title || "Folder"}
         </span>
+
+        {/* Action Buttons */}
+        <div
+          className={`${
+            isSingleColumn || alwaysShowActions
+              ? "flex"
+              : "flex md:hidden md:group-hover/folder:flex"
+          } items-center gap-1 shrink-0 -my-1`}
+        >
+          <button
+            onClick={handleCopyFolder}
+            title={`Copy all ${countTabs(folder)} tab URLs in folder`}
+            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+              isDarkTheme
+                ? "text-white/70 hover:text-white hover:bg-white/20"
+                : "text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+            }`}
+          >
+            {copied ? (
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
+          </button>
+          <button
+            onClick={handleOpenFolder}
+            title={`Open all ${countTabs(folder)} tabs in folder`}
+            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+              isDarkTheme
+                ? "text-white/70 hover:text-white hover:bg-white/20"
+                : "text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+            }`}
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Nested Children Indented */}

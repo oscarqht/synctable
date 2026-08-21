@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { countTabs, countWorkspaces, extractWorkspacesFromRoot, getWorkspaceGradientStyle } from "./treeUtils";
+import { countTabs, countWorkspaces, extractWorkspacesFromRoot, getWorkspaceGradientStyle, getAllTabUrls } from "./treeUtils";
 import type { BrowserTreeNode } from "./types";
 
 describe("treeUtils - workspace extraction", () => {
@@ -252,5 +252,172 @@ describe("treeUtils - workspace extraction", () => {
     // Empty/null
     expect(getWorkspaceGradientStyle(null, null)).toBeUndefined();
     expect(getWorkspaceGradientStyle([], null)).toBeUndefined();
+  });
+});
+
+describe("treeUtils - getAllTabUrls", () => {
+  it("extracts all valid http/https URLs from a workspace with pinned tabs, folders, and split views in tree order", () => {
+    const complexWorkspace: BrowserTreeNode = {
+      id: "ws-1",
+      browser_name: "zen",
+      os_type: "macos",
+      profile_name: "default",
+      node_type: "workspace",
+      title: "Dev Workspace",
+      url: null,
+      parent_id: null,
+      sort_order: 0,
+      snapshot_time: "2026-08-20T10:00:00Z",
+      children: [
+        {
+          id: "pinned-1",
+          browser_name: "zen",
+          os_type: "macos",
+          profile_name: "default",
+          node_type: "pinned_tab",
+          title: "GitHub",
+          url: "https://github.com/oscarqht/synctable",
+          parent_id: "ws-1",
+          sort_order: 0,
+          snapshot_time: "2026-08-20T10:00:00Z",
+        },
+        {
+          id: "folder-1",
+          browser_name: "zen",
+          os_type: "macos",
+          profile_name: "default",
+          node_type: "folder",
+          title: "Documentation",
+          url: null,
+          parent_id: "ws-1",
+          sort_order: 1,
+          snapshot_time: "2026-08-20T10:00:00Z",
+          children: [
+            {
+              id: "tab-doc-1",
+              browser_name: "zen",
+              os_type: "macos",
+              profile_name: "default",
+              node_type: "tab",
+              title: "React Docs",
+              url: "https://react.dev",
+              parent_id: "folder-1",
+              sort_order: 0,
+              snapshot_time: "2026-08-20T10:00:00Z",
+            },
+            {
+              id: "tab-doc-2",
+              browser_name: "zen",
+              os_type: "macos",
+              profile_name: "default",
+              node_type: "tab",
+              title: "MDN Web Docs",
+              url: "https://developer.mozilla.org",
+              parent_id: "folder-1",
+              sort_order: 1,
+              snapshot_time: "2026-08-20T10:00:00Z",
+            },
+          ],
+        },
+        {
+          id: "split-1",
+          browser_name: "zen",
+          os_type: "macos",
+          profile_name: "default",
+          node_type: "split_view",
+          title: "Side by Side",
+          url: null,
+          parent_id: "ws-1",
+          sort_order: 2,
+          snapshot_time: "2026-08-20T10:00:00Z",
+          children: [
+            {
+              id: "tab-split-left",
+              browser_name: "zen",
+              os_type: "macos",
+              profile_name: "default",
+              node_type: "tab",
+              title: "Vite",
+              url: "https://vitejs.dev",
+              parent_id: "split-1",
+              sort_order: 0,
+              snapshot_time: "2026-08-20T10:00:00Z",
+            },
+            {
+              id: "tab-split-right",
+              browser_name: "zen",
+              os_type: "macos",
+              profile_name: "default",
+              node_type: "tab",
+              title: "Bun",
+              url: "https://bun.sh",
+              parent_id: "split-1",
+              sort_order: 1,
+              snapshot_time: "2026-08-20T10:00:00Z",
+            },
+          ],
+        },
+        {
+          id: "tab-regular",
+          browser_name: "zen",
+          os_type: "macos",
+          profile_name: "default",
+          node_type: "tab",
+          title: "Twitter",
+          url: "https://x.com",
+          parent_id: "ws-1",
+          sort_order: 3,
+          snapshot_time: "2026-08-20T10:00:00Z",
+        },
+        {
+          id: "tab-about-blank",
+          browser_name: "zen",
+          os_type: "macos",
+          profile_name: "default",
+          node_type: "tab",
+          title: "New Tab",
+          url: "about:blank",
+          parent_id: "ws-1",
+          sort_order: 4,
+          snapshot_time: "2026-08-20T10:00:00Z",
+        },
+      ],
+    };
+
+    const workspaceUrls = getAllTabUrls(complexWorkspace);
+    expect(workspaceUrls).toEqual([
+      "https://github.com/oscarqht/synctable",
+      "https://react.dev",
+      "https://developer.mozilla.org",
+      "https://vitejs.dev",
+      "https://bun.sh",
+      "https://x.com",
+    ]);
+
+    // Folder extraction
+    const folderUrls = getAllTabUrls(complexWorkspace.children![1]);
+    expect(folderUrls).toEqual([
+      "https://react.dev",
+      "https://developer.mozilla.org",
+    ]);
+
+    // Split view extraction
+    const splitUrls = getAllTabUrls(complexWorkspace.children![2]);
+    expect(splitUrls).toEqual([
+      "https://vitejs.dev",
+      "https://bun.sh",
+    ]);
+
+    // Single tab node
+    expect(getAllTabUrls(complexWorkspace.children![0])).toEqual([
+      "https://github.com/oscarqht/synctable",
+    ]);
+
+    // Invalid / empty URL node
+    expect(getAllTabUrls(complexWorkspace.children![4])).toEqual([]);
+
+    // Null or undefined
+    expect(getAllTabUrls(null)).toEqual([]);
+    expect(getAllTabUrls(undefined)).toEqual([]);
   });
 });

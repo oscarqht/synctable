@@ -24,6 +24,33 @@ export function countTabs(node: BrowserTreeNode): number {
 }
 
 /**
+ * Recursively extracts all valid http/https tab URLs from a node in order.
+ */
+export function getAllTabUrls(node?: BrowserTreeNode | null): string[] {
+  if (!node) return [];
+  const urls: string[] = [];
+
+  function traverse(n: BrowserTreeNode) {
+    if ((n.node_type === "tab" || n.node_type === "pinned_tab") && isValidHttpUrl(n.url)) {
+      urls.push(n.url!.trim());
+      return;
+    }
+    if ((!n.children || n.children.length === 0) && isValidHttpUrl(n.url)) {
+      urls.push(n.url!.trim());
+      return;
+    }
+    if (n.children && Array.isArray(n.children)) {
+      for (const child of n.children) {
+        traverse(child);
+      }
+    }
+  }
+
+  traverse(node);
+  return urls;
+}
+
+/**
  * Recursively prune empty containers and invalid/non-http tabs.
  * Returns null if the node itself or all of its children are empty.
  */

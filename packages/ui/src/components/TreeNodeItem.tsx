@@ -16,7 +16,7 @@ import {
   Compass,
 } from "lucide-react";
 import type { BrowserTreeNode, NodeType } from "../types";
-import { countTabs, isDarkColor, getDomain, getFaviconUrl, getWorkspaceGradientStyle } from "../utils/treeUtils";
+import { countTabs, getAllTabUrls, isDarkColor, getDomain, getFaviconUrl, getWorkspaceGradientStyle } from "../utils/treeUtils";
 import { ZenFolderIcon } from "./zen/ZenFolderIcon";
 import { ZenSplitViewItem } from "./zen/ZenSplitViewItem";
 
@@ -227,10 +227,16 @@ export function TreeNodeItem({
   const favicon = getFaviconUrl(node.url);
   const domain = getDomain(node.url);
 
+  const nodeUrls = React.useMemo(() => {
+    if (node.url) return [node.url];
+    return getAllTabUrls(node);
+  }, [node]);
+
   const handleCopyUrl = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (node.url) {
-      navigator.clipboard.writeText(node.url);
+    e.preventDefault();
+    if (nodeUrls.length > 0) {
+      navigator.clipboard.writeText(nodeUrls.join("\n"));
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     }
@@ -238,10 +244,14 @@ export function TreeNodeItem({
 
   const handleOpenLink = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (node.url) {
+    e.preventDefault();
+    if (nodeUrls.length > 0) {
       if (onOpenExternal) {
-        e.preventDefault();
-        onOpenExternal(node.url);
+        nodeUrls.forEach((url) => onOpenExternal(url));
+      } else {
+        nodeUrls.forEach((url) => {
+          window.open(url, "_blank", "noopener,noreferrer");
+        });
       }
     }
   };
@@ -397,8 +407,8 @@ export function TreeNodeItem({
           )}
         </div>
 
-        {/* Actions for Tab Nodes */}
-        {node.url && (
+        {/* Actions for Tab / Workspace / Folder Nodes */}
+        {nodeUrls.length > 0 && (
           <div
             className={`${
               isSingleColumn || alwaysShowActions
@@ -408,7 +418,11 @@ export function TreeNodeItem({
           >
             <button
               onClick={handleCopyUrl}
-              title="Copy URL"
+              title={
+                node.url
+                  ? "Copy URL"
+                  : `Copy all ${nodeUrls.length} tab URLs`
+              }
               className="w-5 h-5 flex items-center justify-center rounded-md text-slate-400 hover:text-cyan-700 hover:bg-cyan-50 dark:hover:bg-slate-800 border border-transparent hover:border-cyan-200 transition-all"
             >
               {copied ? (
@@ -417,16 +431,17 @@ export function TreeNodeItem({
                 <Copy className="w-3.5 h-3.5" />
               )}
             </button>
-            <a
-              href={node.url}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
               onClick={handleOpenLink}
-              title="Open tab in browser"
+              title={
+                node.url
+                  ? "Open tab in browser"
+                  : `Open all ${nodeUrls.length} tabs in browser`
+              }
               className="w-5 h-5 flex items-center justify-center rounded-md text-slate-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-slate-800 border border-transparent hover:border-indigo-200 transition-all"
             >
               <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+            </button>
           </div>
         )}
       </div>

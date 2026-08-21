@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Columns, ExternalLink, Copy, Check } from "lucide-react";
 import type { BrowserTreeNode } from "../../types";
-import { isValidHttpUrl, countTabs, getDomain, getFaviconUrl } from "../../utils/treeUtils";
+import { isValidHttpUrl, countTabs, getAllTabUrls, getDomain, getFaviconUrl } from "../../utils/treeUtils";
 
 export interface ZenSplitViewItemProps {
   node: BrowserTreeNode;
@@ -25,11 +25,38 @@ export function ZenSplitViewItem({
   onOpenExternal,
 }: ZenSplitViewItemProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [splitCopied, setSplitCopied] = useState<boolean>(false);
   const children = (node.children || []).filter((c) => isValidHttpUrl(c.url));
 
   if (countTabs(node) === 0 || children.length === 0) {
     return null;
   }
+
+  const handleCopySplitView = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const urls = getAllTabUrls(node);
+    if (urls.length > 0) {
+      navigator.clipboard.writeText(urls.join("\n"));
+      setSplitCopied(true);
+      setTimeout(() => setSplitCopied(false), 1600);
+    }
+  };
+
+  const handleOpenSplitView = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const urls = getAllTabUrls(node);
+    if (urls.length > 0) {
+      if (onOpenExternal) {
+        urls.forEach((url) => onOpenExternal(url));
+      } else {
+        urls.forEach((url) => {
+          window.open(url, "_blank", "noopener,noreferrer");
+        });
+      }
+    }
+  };
 
   const handleCopyUrl = (e: React.MouseEvent, tab: BrowserTreeNode) => {
     e.stopPropagation();
@@ -97,17 +124,45 @@ export function ZenSplitViewItem({
           isDarkTheme ? "text-white" : "text-slate-700 dark:text-slate-200"
         }`}
       >
-        <div className="flex items-center gap-1.5">
-          <Columns className={`w-3 h-3 ${isDarkTheme ? "text-white" : "text-slate-600 dark:text-slate-300"}`} />
-          <span>{node.title || "Split View"}</span>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <Columns className={`w-3 h-3 shrink-0 ${isDarkTheme ? "text-white" : "text-slate-600 dark:text-slate-300"}`} />
+          <span className="truncate">{node.title || "Split View"}</span>
         </div>
-        <span
-          className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-            isDarkTheme ? "bg-white/20 text-white" : "bg-black/5 dark:bg-white/15 text-slate-700 dark:text-slate-200"
-          }`}
-        >
-          {children.length} panes
-        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            onClick={handleCopySplitView}
+            title="Copy all URLs in split view"
+            className={`w-4 h-4 flex items-center justify-center rounded transition-all ${
+              isDarkTheme
+                ? "text-white/70 hover:text-white hover:bg-white/20"
+                : "text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-black/5 dark:hover:bg-white/15"
+            }`}
+          >
+            {splitCopied ? (
+              <Check className="w-2.5 h-2.5 text-emerald-500" />
+            ) : (
+              <Copy className="w-2.5 h-2.5" />
+            )}
+          </button>
+          <button
+            onClick={handleOpenSplitView}
+            title="Open all tabs in split view"
+            className={`w-4 h-4 flex items-center justify-center rounded transition-all ${
+              isDarkTheme
+                ? "text-white/70 hover:text-white hover:bg-white/20"
+                : "text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-black/5 dark:hover:bg-white/15"
+            }`}
+          >
+            <ExternalLink className="w-2.5 h-2.5" />
+          </button>
+          <span
+            className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+              isDarkTheme ? "bg-white/20 text-white" : "bg-black/5 dark:bg-white/15 text-slate-700 dark:text-slate-200"
+            }`}
+          >
+            {children.length} panes
+          </span>
+        </div>
       </div>
 
       {/* Side-by-Side Panes (Zen Segmented Card) */}

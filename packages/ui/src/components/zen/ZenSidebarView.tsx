@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, Copy, Check, ExternalLink } from "lucide-react";
 import type { BrowserTreeNode, WorkspaceItem } from "../../types";
 import {
   countTabs,
+  getAllTabUrls,
   pruneEmptyNodes,
   extractWorkspacesFromRoot,
   isDarkColor,
@@ -33,6 +34,7 @@ export function ZenSidebarView({
 }: ZenSidebarViewProps) {
   const [internalSearch, setInternalSearch] = useState("");
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const activeSearch = externalSearch || internalSearch;
 
@@ -106,6 +108,34 @@ export function ZenSidebarView({
 
   const handleSelectTab = (tab: BrowserTreeNode) => {
     setActiveTabId(tab.id || null);
+  };
+
+  const handleCopyAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!workspaceNode) return;
+    const urls = getAllTabUrls(workspaceNode);
+    if (urls.length > 0) {
+      navigator.clipboard.writeText(urls.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    }
+  };
+
+  const handleOpenAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!workspaceNode) return;
+    const urls = getAllTabUrls(workspaceNode);
+    if (urls.length > 0) {
+      if (onOpenExternal) {
+        urls.forEach((url) => onOpenExternal(url));
+      } else {
+        urls.forEach((url) => {
+          window.open(url, "_blank", "noopener,noreferrer");
+        });
+      }
+    }
   };
 
   const renderItem = (item: BrowserTreeNode, idx: number) => {
@@ -183,7 +213,7 @@ export function ZenSidebarView({
           : "border border-gray-300 dark:border-gray-600 bg-slate-100/90 dark:bg-slate-900/90"
       }`}
     >
-      {/* Top Controls: Browser & Profile Info + Tab Count */}
+      {/* Top Controls: Browser & Profile Info + Action Buttons + Tab Count */}
       <div className="flex items-center justify-between w-full pb-2 mb-2">
         <div className="flex items-center gap-2 min-w-0 px-1">
           <span
@@ -211,17 +241,49 @@ export function ZenSidebarView({
             </span>
           )}
         </div>
-        <span
-          className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-            isDark
-              ? "text-white/90 bg-white/20 border border-white/20"
-              : hasThemeBg
-              ? "text-slate-700 dark:text-slate-200 bg-white/50 dark:bg-black/20 border border-white/40 dark:border-white/10 shadow-xs"
-              : "text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800/60"
-          }`}
-        >
-          {tabCount} {tabCount === 1 ? "tab" : "tabs"}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={handleCopyAll}
+            title="Copy all tab URLs in workspace"
+            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+              isDark
+                ? "text-white/70 hover:text-white hover:bg-white/20"
+                : hasThemeBg
+                ? "text-slate-600 dark:text-slate-300 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-white/40 dark:hover:bg-white/10"
+                : "text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
+            }`}
+          >
+            {copied ? (
+              <Check className="w-3.5 h-3.5 text-emerald-500" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
+          </button>
+          <button
+            onClick={handleOpenAll}
+            title="Open all tabs in workspace"
+            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+              isDark
+                ? "text-white/70 hover:text-white hover:bg-white/20"
+                : hasThemeBg
+                ? "text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-white/40 dark:hover:bg-white/10"
+                : "text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
+            }`}
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+          </button>
+          <span
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+              isDark
+                ? "text-white/90 bg-white/20 border border-white/20"
+                : hasThemeBg
+                ? "text-slate-700 dark:text-slate-200 bg-white/50 dark:bg-black/20 border border-white/40 dark:border-white/10 shadow-xs"
+                : "text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800/60"
+            }`}
+          >
+            {tabCount} {tabCount === 1 ? "tab" : "tabs"}
+          </span>
+        </div>
       </div>
 
       {/* Search Input */}
