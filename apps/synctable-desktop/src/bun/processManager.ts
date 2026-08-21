@@ -2,6 +2,7 @@ import { homedir, platform } from "node:os";
 import { join } from "node:path";
 import { existsSync, mkdirSync, cpSync, readdirSync } from "node:fs";
 import type { InstalledBrowser } from "../shared/types";
+import { resolveMozillaProfileDir, findChromiumProfileDir } from "./serializers";
 
 export interface BrowserAppInfo {
   id: string;
@@ -158,18 +159,29 @@ export async function isBrowserRunning(browser: string): Promise<boolean> {
   try {
     for (const name of b.appNames) {
       const cleanName = name.replace(/\.app$/, "");
-      const proc = Bun.spawn(["pgrep", "-x", cleanName], { stdout: "pipe", stderr: "pipe" });
-      const code = await proc.exited;
-      if (code === 0) return true;
+      const p1 = Bun.spawn(["pgrep", "-i", "-x", cleanName], { stdout: "pipe", stderr: "pipe" });
+      if ((await p1.exited) === 0) return true;
+
+      const p2 = Bun.spawn(["pgrep", "-i", "-f", `${cleanName}.app/Contents/MacOS`], { stdout: "pipe", stderr: "pipe" });
+      if ((await p2.exited) === 0) return true;
     }
 
-    // Also check pgrep -f for .app/Contents/MacOS
-    for (const name of b.appNames) {
-      const cleanName = name.replace(/\.app$/, "");
-      const proc = Bun.spawn(["pgrep", "-f", `${cleanName}.app/Contents/MacOS`], { stdout: "pipe", stderr: "pipe" });
-      const code = await proc.exited;
-      if (code === 0) return true;
+    const commonBinaries: Record<string, string[]> = {
+      firefox: ["firefox", "firefox-bin"],
+      zen: ["zen", "zen-bin"],
+      chrome: ["Google Chrome", "chrome"],
+      arc: ["Arc"],
+      vivaldi: ["Vivaldi"],
+      brave: ["Brave Browser", "brave"],
+      edge: ["Microsoft Edge", "msedge"],
+    };
+
+    const bins = commonBinaries[browser.toLowerCase()] || [];
+    for (const bin of bins) {
+      const p = Bun.spawn(["pgrep", "-i", "-x", bin], { stdout: "pipe", stderr: "pipe" });
+      if ((await p.exited) === 0) return true;
     }
+
     return false;
   } catch {
     return false;
@@ -199,27 +211,47 @@ export async function killBrowserProcess(browser: string): Promise<boolean> {
     // Ignore error and proceed to verification
   }
 
-  // Wait up to 2 seconds for graceful quit
-  for (let i = 0; i < 8; i++) {
+  // Wait up to 3 seconds for graceful quit
+  for (let i = 0; i < 12; i++) {
     await new Promise((resolve) => setTimeout(resolve, 250));
     const running = await isBrowserRunning(browser);
-    if (!running) return true;
+    if (!running) {
+      // Extra cushion to ensure all child processes and file write buffers are finished
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return true;
+    }
   }
 
   // 2. Force terminate with pkill -9 if still running
   try {
     for (const name of b.appNames) {
       const cleanName = name.replace(/\.app$/, "");
-      const p1 = Bun.spawn(["pkill", "-9", "-x", cleanName], { stdout: "pipe", stderr: "pipe" });
+      const p1 = Bun.spawn(["pkill", "-9", "-i", "-x", cleanName], { stdout: "pipe", stderr: "pipe" });
       await p1.exited;
-      const p2 = Bun.spawn(["pkill", "-9", "-f", `${cleanName}.app/Contents/MacOS`], { stdout: "pipe", stderr: "pipe" });
+      const p2 = Bun.spawn(["pkill", "-9", "-i", "-f", `${cleanName}.app/Contents/MacOS`], { stdout: "pipe", stderr: "pipe" });
       await p2.exited;
+    }
+
+    const commonBinaries: Record<string, string[]> = {
+      firefox: ["firefox", "firefox-bin"],
+      zen: ["zen", "zen-bin"],
+      chrome: ["Google Chrome", "chrome"],
+      arc: ["Arc"],
+      vivaldi: ["Vivaldi"],
+      brave: ["Brave Browser", "brave"],
+      edge: ["Microsoft Edge", "msedge"],
+    };
+
+    const bins = commonBinaries[browser.toLowerCase()] || [];
+    for (const bin of bins) {
+      const p = Bun.spawn(["pkill", "-9", "-i", "-x", bin], { stdout: "pipe", stderr: "pipe" });
+      await p.exited;
     }
   } catch {
     // ignore
   }
 
-  await new Promise((resolve) => setTimeout(resolve, 300));
+  await new Promise((resolve) => setTimeout(resolve, 500));
   return !(await isBrowserRunning(browser));
 }
 
@@ -243,37 +275,21 @@ export async function backupBrowserSession(browser: string, profileName?: string
     }
   }
 
-  if (b === "zen") {
-    const zenProfilesDir = join(appSupport, "zen", "Profiles");
-    if (existsSync(zenProfilesDir)) {
-      const entries = readdirSync(zenProfilesDir);
-      const chosen = entries.find((e) => profileName ? e === profileName || e.includes(profileName) : e.includes("release") || e.includes("Default")) || entries[0];
-      if (chosen) {
-        const fullProf = join(zenProfilesDir, chosen);
-        mkdirSync(backupDir, { recursive: true });
-        const rec = join(fullProf, "sessionstore-backups", "recovery.jsonlz4");
-        const sess = join(fullProf, "sessionstore.jsonlz4");
-        if (existsSync(rec)) cpSync(rec, join(backupDir, "recovery.jsonlz4"));
-        if (existsSync(sess)) cpSync(sess, join(backupDir, "sessionstore.jsonlz4"));
-        return backupDir;
-      }
-    }
-  }
+  if (b === "zen" || b === "firefox") {
+    const baseDir = join(appSupport, b === "zen" ? "zen" : "Firefox");
+    const fullProf = resolveMozillaProfileDir(baseDir, profileName);
+    if (fullProf && existsSync(fullProf)) {
+      mkdirSync(backupDir, { recursive: true });
+      const rec = join(fullProf, "sessionstore-backups", "recovery.jsonlz4");
+      const sess = join(fullProf, "sessionstore.jsonlz4");
+      const userJs = join(fullProf, "user.js");
+      const prefsJs = join(fullProf, "prefs.js");
 
-  if (b === "firefox") {
-    const ffProfilesDir = join(appSupport, "Firefox", "Profiles");
-    if (existsSync(ffProfilesDir)) {
-      const entries = readdirSync(ffProfilesDir);
-      const chosen = entries.find((e) => profileName ? e === profileName || e.includes(profileName) : e.includes("default-release") || e.includes("default")) || entries[0];
-      if (chosen) {
-        const fullProf = join(ffProfilesDir, chosen);
-        mkdirSync(backupDir, { recursive: true });
-        const rec = join(fullProf, "sessionstore-backups", "recovery.jsonlz4");
-        const sess = join(fullProf, "sessionstore.jsonlz4");
-        if (existsSync(rec)) cpSync(rec, join(backupDir, "recovery.jsonlz4"));
-        if (existsSync(sess)) cpSync(sess, join(backupDir, "sessionstore.jsonlz4"));
-        return backupDir;
-      }
+      if (existsSync(rec)) cpSync(rec, join(backupDir, "recovery.jsonlz4"));
+      if (existsSync(sess)) cpSync(sess, join(backupDir, "sessionstore.jsonlz4"));
+      if (existsSync(userJs)) cpSync(userJs, join(backupDir, "user.js"));
+      if (existsSync(prefsJs)) cpSync(prefsJs, join(backupDir, "prefs.js"));
+      return backupDir;
     }
   }
 
@@ -285,17 +301,9 @@ export async function backupBrowserSession(browser: string, profileName?: string
     edge: join(appSupport, "Microsoft Edge"),
   };
 
-  if (chromiumBaseDirMap[b] && existsSync(chromiumBaseDirMap[b])) {
-    const base = chromiumBaseDirMap[b];
-    const entries = readdirSync(base);
-    const chosen = profileName && entries.includes(profileName)
-      ? profileName
-      : entries.includes("Default")
-        ? "Default"
-        : entries.find((e) => e.startsWith("Profile "));
-
-    if (chosen) {
-      const fullProf = join(base, chosen);
+  if (chromiumBaseDirMap[b]) {
+    const fullProf = findChromiumProfileDir(chromiumBaseDirMap[b], profileName);
+    if (fullProf && existsSync(fullProf)) {
       const sessionsDir = join(fullProf, "Sessions");
       const prefFile = join(fullProf, "Preferences");
 

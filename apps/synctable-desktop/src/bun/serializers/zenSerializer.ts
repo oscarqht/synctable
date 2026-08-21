@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import lz4js from "lz4js";
 import { extractWorkspacesFromRoot, isValidHttpUrl, type BrowserTreeNode } from "@synctable/ui";
@@ -9,84 +9,142 @@ export interface ZenSerializerOptions {
   mode?: "merge" | "overwrite";
 }
 
-const MOZ_MAGIC = "mozLz40\0";
-
-export function compressMozLz4(jsonStr: string): Buffer {
-  const uncompressed = new TextEncoder().encode(jsonStr);
-  const hashTable = new Uint32Array(65536);
-  const maxCompressedSize = lz4js.compressBound(uncompressed.length);
-  const compressedBlock = new Uint8Array(maxCompressedSize);
-  const compressedSize = lz4js.compressBlock(uncompressed, compressedBlock, 0, uncompressed.length, hashTable);
-
-  const finalBuf = Buffer.alloc(12 + compressedSize);
-  finalBuf.write(MOZ_MAGIC, 0, 8, "utf-8");
-  finalBuf.writeUInt32LE(uncompressed.length, 8);
-  finalBuf.set(compressedBlock.subarray(0, compressedSize), 12);
-  return finalBuf;
-}
+const MOZ_LZ4_MAGIC = "mozLz40\0"; // 8 bytes: 6d 6f 7a 4c 7a 34 30 00
 
 export function decompressMozLz4(buffer: Buffer): any {
-  if (buffer.length >= 12 && buffer.subarray(0, 8).toString("utf-8") === MOZ_MAGIC) {
-    const uncompressedSize = buffer.readUInt32LE(8);
-    const compressed = buffer.subarray(12);
-    const uncompressed = new Uint8Array(uncompressedSize);
-    lz4js.decompressBlock(compressed, uncompressed, 0, compressed.length, 0);
-    const jsonStr = new TextDecoder().decode(uncompressed);
-    return JSON.parse(jsonStr);
+  const magic = buffer.subarray(0, 8).toString("binary");
+  if (magic !== MOZ_LZ4_MAGIC) {
+    throw new Error("Invalid Mozilla LZ4 header magic");
   }
-  return JSON.parse(buffer.toString("utf-8"));
+
+  const uncompressedSize = buffer.readUInt32LE(8);
+  const compressedData = buffer.subarray(12);
+
+  const decompressed = new Uint8Array(uncompressedSize);
+  lz4js.decompressBlock(compressedData, decompressed, 0, compressedData.length, 0);
+
+  const jsonStr = new TextDecoder().decode(decompressed);
+  return JSON.parse(jsonStr);
+}
+
+export function compressMozLz4(jsonString: string): Buffer {
+  const uncompressedBytes = new TextEncoder().encode(jsonString);
+  const uncompressedSize = uncompressedBytes.length;
+
+  const maxCompressedSize = lz4js.compressBound(uncompressedSize);
+  const compressedBlock = new Uint8Array(maxCompressedSize);
+  const sTable = new Uint32Array(65536);
+
+  const compressedLen = lz4js.compressBlock(
+    uncompressedBytes,
+    compressedBlock,
+    0,
+    uncompressedSize,
+    sTable
+  );
+
+  const outBuf = Buffer.alloc(8 + 4 + compressedLen);
+  outBuf.write(MOZ_LZ4_MAGIC, 0, 8, "binary");
+  outBuf.writeUInt32LE(uncompressedSize, 8);
+  outBuf.set(compressedBlock.subarray(0, compressedLen), 12);
+
+  return outBuf;
 }
 
 export function serializeToZenSession(
   nodes: BrowserTreeNode[],
   options: ZenSerializerOptions
-): { success: boolean; spacesCount: number; tabsCount: number; error?: string } {
+): {
+  success: boolean;
+  spacesCount: number;
+  tabsCount: number;
+  error?: string;
+} {
   try {
     const { profilePath, mode = "merge" } = options;
+
+    if (!existsSync(profilePath)) {
+      mkdirSync(profilePath, { recursive: true });
+    }
 
     const recoveryPath = join(profilePath, "sessionstore-backups", "recovery.jsonlz4");
     const sessionPath = join(profilePath, "sessionstore.jsonlz4");
 
     let existingData: any = null;
-    const sourcePath = existsSync(recoveryPath) ? recoveryPath : existsSync(sessionPath) ? sessionPath : null;
-
-    if (sourcePath && mode === "merge") {
-      try {
-        const raw = readFileSync(sourcePath);
-        existingData = decompressMozLz4(raw);
-      } catch (err) {
-        console.warn("[ZenSerializer] Failed to decompress existing session, initializing new:", err);
+    if (mode === "merge") {
+      const pathToRead = existsSync(recoveryPath) ? recoveryPath : existsSync(sessionPath) ? sessionPath : null;
+      if (pathToRead) {
+        try {
+          const rawBuf = readFileSync(pathToRead);
+          existingData = decompressMozLz4(rawBuf);
+        } catch {
+          existingData = null;
+        }
       }
     }
 
-    if (!existingData || typeof existingData !== "object") {
+    const now = Date.now();
+
+    if (!existingData || !existingData.windows || !Array.isArray(existingData.windows) || existingData.windows.length === 0) {
       existingData = {
         version: ["sessionrestore", 1],
-        windows: [{ tabs: [], spaces: [], folders: [], selected: 1 }],
+        windows: [
+          {
+            tabs: [],
+            selected: 1,
+            _closedTabs: [],
+            busy: false,
+            zIndex: 1,
+            width: 1400,
+            height: 900,
+            screenX: 100,
+            screenY: 100,
+            sizemode: "normal",
+            spaces: [],
+            folders: [],
+            activeZenSpace: null,
+          },
+        ],
+        _closedWindows: [],
+        selectedWindow: 1,
+        session: {
+          lastUpdate: now,
+          startTime: now - 10000,
+          recentCrashes: 0,
+        },
+        global: {},
+        cookies: [],
+        savedGroups: [],
+        maxSplitViewId: 0,
       };
     }
 
-    if (!Array.isArray(existingData.windows) || existingData.windows.length === 0) {
-      existingData.windows = [{ tabs: [], spaces: [], folders: [], selected: 1 }];
-    }
-
     const win0 = existingData.windows[0];
-    if (!Array.isArray(win0.tabs)) win0.tabs = [];
-    if (!Array.isArray(win0.spaces)) win0.spaces = [];
-    if (!Array.isArray(win0.folders)) win0.folders = [];
+    win0.spaces = win0.spaces || [];
+    win0.folders = win0.folders || [];
 
-    if (mode === "overwrite") {
+    if (mode === "merge") {
+      // Filter out about:home / about:blank / about:newtab so they don't hide restored tabs
+      win0.tabs = (win0.tabs || []).filter((t: any) => {
+        const url = t?.entries?.[t.entries.length - 1]?.url;
+        return url && !url.startsWith("about:") && isValidHttpUrl(url);
+      });
+    } else {
       win0.tabs = [];
       win0.spaces = [];
       win0.folders = [];
     }
 
+    win0.selected = 1;
+    win0._closedTabs = [];
+    win0.busy = false;
+
     const workspaces = nodes.flatMap(extractWorkspacesFromRoot);
     if (workspaces.length === 0 && nodes.length > 0) {
       workspaces.push({
         id: randomUUID(),
-        browserName: "imported",
-        browserTitle: "Imported Workspace",
+        browserName: "zen",
+        browserTitle: "Zen Browser",
         profileName: "Default",
         workspaceTitle: "Restored Workspace",
         node: {
@@ -161,8 +219,20 @@ export function serializeToZenSession(
               if (isValidHttpUrl(child.url)) {
                 totalTabs++;
                 win0.tabs.push({
-                  entries: [{ url: child.url, title: child.title || child.url }],
+                  entries: [
+                    {
+                      url: child.url,
+                      title: child.title || child.url,
+                      triggeringPrincipal_base64: '{"3":{}}',
+                      docshellUUID: `{${randomUUID()}}`,
+                      transient: false,
+                    },
+                  ],
+                  lastAccessed: now,
+                  hidden: false,
+                  userContextId: 0,
                   index: 1,
+                  image: null,
                   pinned: false,
                   zenWorkspace: spaceUUID,
                   groupId: splitId,
@@ -178,8 +248,20 @@ export function serializeToZenSession(
         if ((node.node_type === "tab" || node.node_type === "pinned_tab") && isValidHttpUrl(node.url)) {
           totalTabs++;
           win0.tabs.push({
-            entries: [{ url: node.url, title: node.title || node.url }],
+            entries: [
+              {
+                url: node.url,
+                title: node.title || node.url,
+                triggeringPrincipal_base64: '{"3":{}}',
+                docshellUUID: `{${randomUUID()}}`,
+                transient: false,
+              },
+            ],
+            lastAccessed: now,
+            hidden: false,
+            userContextId: 0,
             index: 1,
+            image: null,
             pinned: node.node_type === "pinned_tab",
             zenWorkspace: spaceUUID,
             groupId: parentFolderId || null,
@@ -199,14 +281,60 @@ export function serializeToZenSession(
       win0.activeZenSpace = win0.spaces[0].uuid;
     }
 
+    // Update global session timestamps
+    existingData.session = existingData.session || {};
+    existingData.session.lastUpdate = now;
+    existingData.session.startTime = now - 10000;
+    existingData.session.recentCrashes = 0;
+
     const compressed = compressMozLz4(JSON.stringify(existingData));
 
     // Ensure backups dir exists
     const backupsDir = join(profilePath, "sessionstore-backups");
     mkdirSync(backupsDir, { recursive: true });
 
-    writeFileSync(recoveryPath, compressed);
+    // Write to all session restore locations that Firefox & Zen look for
     writeFileSync(sessionPath, compressed);
+    writeFileSync(recoveryPath, compressed);
+    writeFileSync(join(backupsDir, "recovery.baklz4"), compressed);
+    writeFileSync(join(backupsDir, "previous.jsonlz4"), compressed);
+
+    // Write sessionCheckpoints.json so Firefox knows clean shutdown occurred with session written
+    const checkpointsPath = join(profilePath, "sessionCheckpoints.json");
+    const checkpoints = {
+      "profile-after-change": true,
+      "final-ui-startup": true,
+      "sessionstore-windows-restored": true,
+      "quit-application-granted": true,
+      "quit-application": true,
+      "sessionstore-final-state-write-complete": true,
+      "profile-change-net-teardown": true,
+      "profile-change-teardown": true,
+      "profile-before-change": true,
+    };
+    writeFileSync(checkpointsPath, JSON.stringify(checkpoints), "utf8");
+
+    // Update or append user.js to ensure Firefox/Zen automatically restores the session on startup
+    const userJsPath = join(profilePath, "user.js");
+    let userJsContent = "";
+    if (existsSync(userJsPath)) {
+      try {
+        userJsContent = readFileSync(userJsPath, "utf8");
+      } catch {
+        userJsContent = "";
+      }
+    }
+
+    const startupPrefs = `
+// SyncTable session restore configuration
+user_pref("browser.startup.page", 3);
+user_pref("browser.sessionstore.resume_from_crash", true);
+user_pref("browser.sessionstore.restore_on_demand", false);
+`;
+
+    if (!userJsContent.includes("browser.startup.page")) {
+      writeFileSync(userJsPath, userJsContent + "\n" + startupPrefs, "utf8");
+    }
 
     return {
       success: true,

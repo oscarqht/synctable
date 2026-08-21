@@ -163,6 +163,8 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
                 error: `Could not terminate running ${targetBrowser} process. Please quit it manually and try again.`,
               };
             }
+            // Give OS and browser process 400ms to completely finish closing file handles
+            await new Promise((resolve) => setTimeout(resolve, 400));
           }
 
           // 3. Serialize and inject native files
@@ -182,6 +184,7 @@ const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
 
           // 4. Relaunch target browser
           console.log(`[RestoreSession] Injection succeeded. Relaunching ${targetBrowser}...`);
+          await new Promise((resolve) => setTimeout(resolve, 200));
           await relaunchBrowser(targetBrowser);
 
           return {
