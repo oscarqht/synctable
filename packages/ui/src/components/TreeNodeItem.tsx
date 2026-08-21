@@ -16,7 +16,7 @@ import {
   Compass,
 } from "lucide-react";
 import type { BrowserTreeNode, NodeType } from "../types";
-import { countTabs, isDarkColor, getDomain, getFaviconUrl } from "../utils/treeUtils";
+import { countTabs, isDarkColor, getDomain, getFaviconUrl, getWorkspaceGradientStyle } from "../utils/treeUtils";
 import { ZenFolderIcon } from "./zen/ZenFolderIcon";
 import { ZenSplitViewItem } from "./zen/ZenSplitViewItem";
 
@@ -250,15 +250,7 @@ export function TreeNodeItem({
   );
 
   const workspaceBgStyle: React.CSSProperties | undefined = isWorkspace
-    ? node.theme_colors && node.theme_colors.length > 1
-      ? {
-          background: `linear-gradient(135deg, ${node.theme_colors.join(
-            ", "
-          )})`,
-        }
-      : node.theme_color
-      ? { background: node.theme_color }
-      : undefined
+    ? getWorkspaceGradientStyle(node.theme_colors, node.theme_color, isDark)
     : undefined;
 
   return (

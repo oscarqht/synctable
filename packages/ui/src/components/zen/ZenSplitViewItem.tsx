@@ -84,22 +84,22 @@ export function ZenSplitViewItem({
       className={`my-1 p-1 rounded-xl border transition-all select-none ${
         isDarkTheme
           ? "border-white/20 bg-white/10 hover:border-white/30 hover:bg-white/15"
-          : "border-cyan-500/30 bg-cyan-500/5 hover:border-cyan-500/50 hover:bg-cyan-500/10"
+          : "border-black/[0.08] dark:border-white/15 bg-white/40 dark:bg-white/10 hover:border-black/15 hover:bg-white/55"
       }`}
     >
       {/* Split View Header */}
       <div
         className={`flex items-center justify-between px-2 py-0.5 mb-1 text-[10px] font-semibold tracking-wide uppercase ${
-          isDarkTheme ? "text-white" : "text-cyan-700 dark:text-cyan-300"
+          isDarkTheme ? "text-white" : "text-slate-700 dark:text-slate-200"
         }`}
       >
         <div className="flex items-center gap-1.5">
-          <Columns className={`w-3 h-3 ${isDarkTheme ? "text-white" : "text-cyan-600"}`} />
+          <Columns className={`w-3 h-3 ${isDarkTheme ? "text-white" : "text-slate-600 dark:text-slate-300"}`} />
           <span>{node.title || "Split View"}</span>
         </div>
         <span
           className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-            isDarkTheme ? "bg-white/20 text-white" : "bg-cyan-500/15 text-cyan-800 dark:text-cyan-200"
+            isDarkTheme ? "bg-white/20 text-white" : "bg-black/5 dark:bg-white/15 text-slate-700 dark:text-slate-200"
           }`}
         >
           {children.length} panes
@@ -107,7 +107,7 @@ export function ZenSplitViewItem({
       </div>
 
       {/* Side-by-Side Panes (Zen Segmented Card) */}
-      <div className="flex items-stretch rounded-lg bg-white/80 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 shadow-2xs overflow-hidden divide-x divide-slate-200/80 dark:divide-slate-800">
+      <div className="flex items-stretch rounded-lg bg-white/70 dark:bg-slate-900/70 backdrop-blur-xs border border-white/50 dark:border-white/10 shadow-2xs overflow-hidden divide-x divide-slate-200/80 dark:divide-slate-800">
         {children.length === 0 ? (
           <div className="p-2 text-xs text-slate-400 text-center w-full">
             Empty Split View

@@ -192,3 +192,58 @@ export function extractWorkspacesFromRoot(rawRootNode: BrowserTreeNode): Workspa
 
   return list;
 }
+
+/**
+ * Checks whether a hex color is dark enough to require light text
+ */
+export function isDarkColor(hexColor?: string | null): boolean {
+  if (!hexColor || !hexColor.startsWith("#")) return false;
+  const hex = hexColor.replace("#", "");
+  const r = parseInt(hex.substring(0, 2), 16) || 0;
+  const g = parseInt(hex.substring(2, 4), 16) || 0;
+  const b = parseInt(hex.substring(4, 6), 16) || 0;
+  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+  return yiq < 140;
+}
+
+/**
+ * Generates smooth, soft, vertical gradient CSS properties for workspace cards.
+ * Uses vertical direction (180deg) with OKLab color-space interpolation and
+ * subtle atmospheric lighting to ensure smoother transitions and softer contrast.
+ */
+export function getWorkspaceGradientStyle(
+  themeColors?: string[] | null,
+  themeColor?: string | null,
+  isDark?: boolean
+): React.CSSProperties | undefined {
+  const colors = (themeColors || []).filter(
+    (c): c is string => typeof c === "string" && Boolean(c.trim())
+  );
+
+  if (colors.length > 1) {
+    const stops = colors.join(", ");
+    const overlay = isDark
+      ? "linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 40%, rgba(0, 0, 0, 0.16) 100%)"
+      : "linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(0, 0, 0, 0.04) 100%)";
+
+    return {
+      backgroundImage: `${overlay}, linear-gradient(180deg in oklab, ${stops})`,
+      backgroundColor: colors[0],
+    };
+  }
+
+  const singleColor =
+    colors[0] || (typeof themeColor === "string" && themeColor.trim() ? themeColor : null);
+  if (singleColor) {
+    const overlay = isDark
+      ? "linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.12) 100%)"
+      : "linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(0, 0, 0, 0.04) 100%)";
+
+    return {
+      backgroundImage: `${overlay}, linear-gradient(180deg, ${singleColor}, ${singleColor})`,
+      backgroundColor: singleColor,
+    };
+  }
+
+  return undefined;
+}

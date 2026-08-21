@@ -61,7 +61,7 @@ export function ZenFolderItem({
         className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl cursor-pointer transition-all duration-150 active:scale-[0.99] ${
           isDarkTheme
             ? "hover:bg-white/15 text-white"
-            : "hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
+            : "hover:bg-white/40 dark:hover:bg-white/10"
         }`}
       >
         {/* Blue Outline Folder Icon */}

@@ -91,10 +91,10 @@ export function ZenTabItem({
       onClick={() => onSelect?.(tab)}
       className={`group/tab relative flex items-center gap-3 px-3.5 py-2.5 min-h-[42px] rounded-2xl cursor-pointer transition-all duration-150 select-none ${
         isActive
-          ? "bg-white text-slate-900 shadow-sm border border-slate-100 dark:border-slate-700/60 font-bold"
+          ? "bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white shadow-xs border border-white/60 dark:border-white/10 font-bold backdrop-blur-xs"
           : isDarkTheme
           ? "hover:bg-white/20 text-white font-medium"
-          : "hover:bg-slate-200/50 dark:hover:bg-slate-800/50 text-slate-800 dark:text-slate-200 font-semibold"
+          : "hover:bg-white/40 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 font-semibold"
       } active:scale-[0.99]`}
     >
       {/* Favicon / Domain badge */}

@@ -16,7 +16,7 @@ import {
   Compass,
 } from "lucide-react";
 import type { BrowserTreeNode, NodeType } from "@/lib/types";
-import { countTabs } from "@/lib/treeUtils";
+import { countTabs, isDarkColor, getWorkspaceGradientStyle } from "@/lib/treeUtils";
 import { getDomain, getFaviconUrl } from "./zen/ZenTabItem";
 import { ZenFolderIcon } from "./zen/ZenFolderIcon";
 import { ZenSplitViewItem } from "./zen/ZenSplitViewItem";
@@ -143,15 +143,6 @@ function hasMatchRecursive(node: BrowserTreeNode, query: string): boolean {
   return false;
 }
 
-function isDarkColor(hexColor?: string | null): boolean {
-  if (!hexColor || !hexColor.startsWith("#")) return false;
-  const hex = hexColor.replace("#", "");
-  const r = parseInt(hex.substring(0, 2), 16) || 0;
-  const g = parseInt(hex.substring(2, 4), 16) || 0;
-  const b = parseInt(hex.substring(4, 6), 16) || 0;
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
-  return yiq < 140;
-}
 
 export function TreeNodeItem({
   node,
@@ -241,11 +232,7 @@ export function TreeNodeItem({
   );
 
   const workspaceBgStyle: React.CSSProperties | undefined = isWorkspace
-    ? node.theme_colors && node.theme_colors.length > 1
-      ? { background: `linear-gradient(135deg, ${node.theme_colors.join(", ")})` }
-      : node.theme_color
-      ? { background: node.theme_color }
-      : undefined
+    ? getWorkspaceGradientStyle(node.theme_colors, node.theme_color, isDark)
     : undefined;
 
   return (

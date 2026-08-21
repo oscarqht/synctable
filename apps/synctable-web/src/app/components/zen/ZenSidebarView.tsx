@@ -3,7 +3,14 @@
 import React, { useState, useMemo } from "react";
 import { Search, X } from "lucide-react";
 import type { BrowserTreeNode } from "@/lib/types";
-import { countTabs, pruneEmptyNodes, extractWorkspacesFromRoot, type WorkspaceItem } from "@/lib/treeUtils";
+import {
+  countTabs,
+  pruneEmptyNodes,
+  extractWorkspacesFromRoot,
+  isDarkColor,
+  getWorkspaceGradientStyle,
+  type WorkspaceItem,
+} from "@/lib/treeUtils";
 import { ZenFolderItem } from "./ZenFolderItem";
 import { ZenSplitViewItem } from "./ZenSplitViewItem";
 import { ZenTabItem } from "./ZenTabItem";
@@ -12,22 +19,14 @@ export interface ZenSidebarViewProps {
   workspaceItem?: WorkspaceItem;
   rootNode?: BrowserTreeNode;
   searchQuery?: string;
-}
-
-function isDarkColor(hexColor?: string | null): boolean {
-  if (!hexColor || !hexColor.startsWith("#")) return false;
-  const hex = hexColor.replace("#", "");
-  const r = parseInt(hex.substring(0, 2), 16) || 0;
-  const g = parseInt(hex.substring(2, 4), 16) || 0;
-  const b = parseInt(hex.substring(4, 6), 16) || 0;
-  const yiq = (r * 299 + g * 587 + b * 114) / 1000;
-  return yiq < 140;
+  onOpenExternal?: (url: string) => void;
 }
 
 export function ZenSidebarView({
   workspaceItem,
   rootNode: rawRootNode,
   searchQuery: externalSearch = "",
+  onOpenExternal,
 }: ZenSidebarViewProps) {
   const [internalSearch, setInternalSearch] = useState("");
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
@@ -151,32 +150,42 @@ function isPinnedNode(item: BrowserTreeNode): boolean {
     currentWorkspaceItem.themeColor
   );
 
-  const themeBgStyle: React.CSSProperties | undefined = currentWorkspaceItem.themeColors && currentWorkspaceItem.themeColors.length > 1
-    ? { background: `linear-gradient(135deg, ${currentWorkspaceItem.themeColors.join(", ")})` }
-    : currentWorkspaceItem.themeColor
-    ? { background: currentWorkspaceItem.themeColor }
-    : undefined;
+  const themeBgStyle = getWorkspaceGradientStyle(
+    currentWorkspaceItem.themeColors,
+    currentWorkspaceItem.themeColor,
+    isDark
+  );
 
   return (
     <div
       style={themeBgStyle}
-      className={`flex flex-col border border-gray-300 dark:border-gray-600 rounded-3xl p-3 sm:p-4 shadow-sm w-full transition-all ${
+      className={`flex flex-col rounded-3xl p-3 sm:p-4 shadow-sm w-full transition-all ${
         hasThemeBg
-          ? ""
-          : "bg-slate-100/90 dark:bg-slate-900/90"
+          ? isDark
+            ? "border border-white/20 shadow-md shadow-black/10"
+            : "border border-black/[0.08] dark:border-white/10 shadow-sm shadow-slate-900/5"
+          : "border border-gray-300 dark:border-gray-600 bg-slate-100/90 dark:bg-slate-900/90"
       }`}
     >
       {/* Top Controls: Browser & Profile Info + Tab Count */}
       <div className="flex items-center justify-between w-full pb-2 mb-2">
         <div className="flex items-center gap-2 min-w-0 px-1">
           <span className={`text-xs font-bold capitalize truncate ${
-            isDark ? "text-white" : "text-slate-800 dark:text-slate-200"
+            isDark
+              ? "text-white"
+              : hasThemeBg
+              ? "text-slate-900 dark:text-slate-100"
+              : "text-slate-800 dark:text-slate-200"
           }`}>
             {browserTitle}
           </span>
           {profileName && profileName !== "Default" && (
             <span className={`text-[10px] font-medium truncate max-w-[120px] px-1.5 py-0.5 rounded ${
-              isDark ? "text-white/80 bg-white/15" : "text-slate-400 dark:text-slate-500"
+              isDark
+                ? "text-white/80 bg-white/15"
+                : hasThemeBg
+                ? "text-slate-600 dark:text-slate-300 bg-white/40 dark:bg-white/10"
+                : "text-slate-400 dark:text-slate-500"
             }`}>
               ({profileName})
             </span>
@@ -185,6 +194,8 @@ function isPinnedNode(item: BrowserTreeNode): boolean {
         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
           isDark
             ? "text-white/90 bg-white/20 border border-white/20"
+            : hasThemeBg
+            ? "text-slate-700 dark:text-slate-200 bg-white/50 dark:bg-black/20 border border-white/40 dark:border-white/10 shadow-xs"
             : "text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800/60"
         }`}>
           {tabCount} {tabCount === 1 ? "tab" : "tabs"}
@@ -195,7 +206,7 @@ function isPinnedNode(item: BrowserTreeNode): boolean {
       {!externalSearch && (
         <div className="relative mb-3 w-full">
           <Search className={`w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 ${
-            isDark ? "text-white/60" : "text-slate-400"
+            isDark ? "text-white/60" : hasThemeBg ? "text-slate-500" : "text-slate-400"
           }`} />
           <input
             type="text"
@@ -205,6 +216,8 @@ function isPinnedNode(item: BrowserTreeNode): boolean {
             className={`w-full pl-8 pr-7 py-1.5 text-xs rounded-xl focus:outline-hidden focus:ring-1.5 transition-all ${
               isDark
                 ? "bg-white/15 border border-white/20 text-white placeholder:text-white/60 focus:bg-white/25 focus:ring-white/40"
+                : hasThemeBg
+                ? "bg-white/55 backdrop-blur-xs border border-white/50 text-slate-800 placeholder:text-slate-500/70 focus:bg-white/80 focus:border-white/80 focus:ring-black/10"
                 : "bg-white/70 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 focus:ring-cyan-500"
             }`}
           />

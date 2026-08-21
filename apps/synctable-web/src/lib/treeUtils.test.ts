@@ -1,5 +1,5 @@
 import { describe, it, expect } from "bun:test";
-import { countTabs, countWorkspaces, extractWorkspacesFromRoot } from "./treeUtils";
+import { countTabs, countWorkspaces, extractWorkspacesFromRoot, getWorkspaceGradientStyle } from "./treeUtils";
 import type { BrowserTreeNode } from "./types";
 
 describe("treeUtils - workspace extraction", () => {
@@ -233,5 +233,24 @@ describe("treeUtils - workspace extraction", () => {
     expect(workspaces).toHaveLength(2);
     expect(workspaces[0].workspaceTitle).toBe("Chrome Window 1");
     expect(workspaces[1].workspaceTitle).toBe("Chrome Window 2");
+  });
+
+  it("renders vertical, smooth, soft gradients with getWorkspaceGradientStyle", () => {
+    // Multi-color vertical gradient
+    const multiStyle = getWorkspaceGradientStyle(["#8ef1cc", "#95dff1", "#99f09e"], "#8ef1cc");
+    expect(multiStyle).toBeDefined();
+    expect(multiStyle?.backgroundImage).toContain("linear-gradient(180deg");
+    expect(multiStyle?.backgroundImage).toContain("180deg in oklab");
+    expect(multiStyle?.backgroundColor).toBe("#8ef1cc");
+
+    // Single color subtle vertical gradient
+    const singleStyle = getWorkspaceGradientStyle(null, "#3366cc");
+    expect(singleStyle).toBeDefined();
+    expect(singleStyle?.backgroundImage).toContain("linear-gradient(180deg");
+    expect(singleStyle?.backgroundColor).toBe("#3366cc");
+
+    // Empty/null
+    expect(getWorkspaceGradientStyle(null, null)).toBeUndefined();
+    expect(getWorkspaceGradientStyle([], null)).toBeUndefined();
   });
 });
