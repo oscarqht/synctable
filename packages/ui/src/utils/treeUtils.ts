@@ -78,41 +78,23 @@ export function isDarkColor(hexColor?: string | null): boolean {
 }
 
 /**
- * Generates smooth, soft, vertical gradient CSS properties for workspace cards.
- * Uses vertical direction (180deg) with OKLab color-space interpolation and
- * subtle atmospheric lighting to ensure smoother transitions and softer contrast.
+ * Generates solid background CSS properties for workspace cards using the main color.
  */
 export function getWorkspaceGradientStyle(
   themeColors?: string[] | null,
   themeColor?: string | null,
-  isDark?: boolean
+  _isDark?: boolean
 ): React.CSSProperties | undefined {
   const colors = (themeColors || []).filter(
     (c): c is string => typeof c === "string" && Boolean(c.trim())
   );
 
-  if (colors.length > 1) {
-    const stops = colors.join(", ");
-    const overlay = isDark
-      ? "linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 40%, rgba(0, 0, 0, 0.16) 100%)"
-      : "linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.02) 45%, rgba(0, 0, 0, 0.04) 100%)";
-
-    return {
-      backgroundImage: `${overlay}, linear-gradient(180deg in oklab, ${stops})`,
-      backgroundColor: colors[0],
-    };
-  }
-
-  const singleColor =
+  const mainColor =
     colors[0] || (typeof themeColor === "string" && themeColor.trim() ? themeColor : null);
-  if (singleColor) {
-    const overlay = isDark
-      ? "linear-gradient(180deg, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.12) 100%)"
-      : "linear-gradient(180deg, rgba(255, 255, 255, 0.14) 0%, rgba(0, 0, 0, 0.04) 100%)";
 
+  if (mainColor) {
     return {
-      backgroundImage: `${overlay}, linear-gradient(180deg, ${singleColor}, ${singleColor})`,
-      backgroundColor: singleColor,
+      backgroundColor: mainColor,
     };
   }
 

@@ -235,19 +235,18 @@ describe("treeUtils - workspace extraction", () => {
     expect(workspaces[1].workspaceTitle).toBe("Chrome Window 2");
   });
 
-  it("renders vertical, smooth, soft gradients with getWorkspaceGradientStyle", () => {
-    // Multi-color vertical gradient
+  it("uses the main color to render the workspace card as solid color background with getWorkspaceGradientStyle", () => {
+    // Multi-color / gradient theme uses the main color as solid background
     const multiStyle = getWorkspaceGradientStyle(["#8ef1cc", "#95dff1", "#99f09e"], "#8ef1cc");
     expect(multiStyle).toBeDefined();
-    expect(multiStyle?.backgroundImage).toContain("linear-gradient(180deg");
-    expect(multiStyle?.backgroundImage).toContain("180deg in oklab");
     expect(multiStyle?.backgroundColor).toBe("#8ef1cc");
+    expect(multiStyle?.backgroundImage).toBeUndefined();
 
-    // Single color subtle vertical gradient
+    // Single color subtle theme
     const singleStyle = getWorkspaceGradientStyle(null, "#3366cc");
     expect(singleStyle).toBeDefined();
-    expect(singleStyle?.backgroundImage).toContain("linear-gradient(180deg");
     expect(singleStyle?.backgroundColor).toBe("#3366cc");
+    expect(singleStyle?.backgroundImage).toBeUndefined();
 
     // Empty/null
     expect(getWorkspaceGradientStyle(null, null)).toBeUndefined();
