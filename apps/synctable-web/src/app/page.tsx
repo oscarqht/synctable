@@ -383,35 +383,6 @@ export default function Home() {
           />
         )}
       </main>
-
-      {/* Footer Component */}
-      <footer className="w-full mt-auto">
-        <div className="w-full max-w-max-width mx-auto px-container-padding py-8 flex justify-between items-center border-t border-outline-variant/30">
-          <p className="font-label-md text-label-md text-on-surface-variant dark:text-surface-variant">
-            © 2024 Synctable. Designed for Digital Hygge.
-          </p>
-          <div className="flex items-center gap-6">
-            <a
-              className="font-label-md text-label-md text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors"
-              href="#"
-            >
-              Privacy
-            </a>
-            <a
-              className="font-label-md text-label-md text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors"
-              href="#"
-            >
-              Terms
-            </a>
-            <a
-              className="font-label-md text-label-md text-on-surface-variant dark:text-surface-variant hover:text-primary dark:hover:text-primary-fixed-dim transition-colors"
-              href="#"
-            >
-              Support
-            </a>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }
