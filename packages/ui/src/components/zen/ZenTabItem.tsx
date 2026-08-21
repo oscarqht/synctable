@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { Copy, Check, ExternalLink } from "lucide-react";
 import type { BrowserTreeNode } from "../../types";
 import { isValidHttpUrl, getDomain, getFaviconUrl } from "../../utils/treeUtils";
 
@@ -62,12 +61,12 @@ export function ZenTabItem({
       <div
         onClick={() => onSelect?.(tab)}
         title={`${tab.title || domain || "Tab"}\n${tab.url || ""}`}
-        className={`w-10 h-10 rounded-2xl flex items-center justify-center relative cursor-pointer group/tab transition-all duration-150 active:scale-95 ${
+        className={`w-10 h-10 rounded-lg flex items-center justify-center relative cursor-pointer group/tab transition-all duration-150 active:scale-95 ${
           isActive
-            ? "bg-white dark:bg-slate-800 shadow-sm ring-2 ring-cyan-500/50"
+            ? "bg-white dark:bg-surface-container-highest shadow-xs ring-2 ring-primary/50"
             : isDarkTheme
             ? "hover:bg-white/20 text-white"
-            : "hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300"
+            : "hover:bg-surface-container-low text-on-surface"
         }`}
       >
         {favicon && !imgError ? (
@@ -75,12 +74,12 @@ export function ZenTabItem({
             src={favicon}
             alt=""
             onError={() => setImgError(true)}
-            className="w-5 h-5 rounded object-contain shrink-0"
+            className="w-4 h-4 rounded object-contain shrink-0"
           />
         ) : (
           <span
-            className={`w-5 h-5 rounded-lg text-[11px] font-bold flex items-center justify-center uppercase ${
-              isDarkTheme ? "bg-white/20 text-white" : "bg-slate-200 dark:bg-slate-700"
+            className={`w-5 h-5 rounded text-[11px] font-bold flex items-center justify-center uppercase ${
+              isDarkTheme ? "bg-white/20 text-white" : "bg-surface-container text-on-surface"
             }`}
           >
             {domain ? domain.charAt(0) : "T"}
@@ -91,18 +90,21 @@ export function ZenTabItem({
   }
 
   return (
-    <div
+    <button
+      type="button"
       onClick={() => onSelect?.(tab)}
-      className={`group/tab relative flex items-center gap-3 px-3.5 py-2.5 min-h-[42px] rounded-2xl cursor-pointer transition-all duration-150 select-none ${
+      className={`group/tab relative flex items-center gap-2.5 w-full h-9 px-3 rounded-lg text-left cursor-pointer transition-colors duration-200 select-none ${
         isActive
-          ? "bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white shadow-xs border border-white/60 dark:border-white/10 font-bold backdrop-blur-xs"
+          ? isDarkTheme
+            ? "bg-white/25 text-white font-bold"
+            : "bg-surface-container-high text-on-surface font-bold shadow-2xs"
           : isDarkTheme
-          ? "hover:bg-white/20 text-white font-medium"
-          : "hover:bg-white/40 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 font-semibold"
-      } active:scale-[0.99]`}
+          ? "hover:bg-white/20 text-inherit font-normal"
+          : "hover:bg-surface-container-low text-on-surface font-normal"
+      }`}
     >
-      {/* Favicon / Domain badge */}
-      <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 overflow-hidden">
+      {/* Favicon / Domain Icon */}
+      <div className="w-5 h-5 flex items-center justify-center shrink-0 overflow-hidden">
         {favicon && !imgError ? (
           <img
             src={favicon}
@@ -111,65 +113,65 @@ export function ZenTabItem({
             className="w-4 h-4 object-contain rounded"
           />
         ) : (
-          <span className="w-4 h-4 rounded bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center uppercase">
-            {domain ? domain.charAt(0) : "M"}
+          <span className="material-symbols-outlined text-[16px] opacity-80 leading-none">
+            public
           </span>
         )}
       </div>
 
       {/* Tab Title */}
-      <div className="flex-1 min-w-0 flex items-center">
-        <span
-          className={`text-sm truncate leading-tight tracking-tight ${
-            isDarkTheme && !isActive ? "text-white font-medium" : ""
-          }`}
-          title={tab.title || domain || "Tab"}
-        >
-          {tab.title || domain || "Untitled Tab"}
-        </span>
-      </div>
+      <span
+        className={`font-body-sm text-body-sm truncate flex-1 min-w-0 ${
+          isActive ? "font-bold" : ""
+        }`}
+        title={tab.title || domain || "Tab"}
+      >
+        {tab.title || domain || "Untitled Tab"}
+      </span>
 
       {/* Action Buttons */}
       {tab.url && (
         <div
           className={`${
             isSingleColumn || alwaysShowActions
-              ? "flex"
-              : "flex md:hidden md:group-hover/tab:flex"
-          } items-center gap-1 shrink-0 -my-1`}
+              ? "opacity-100"
+              : "opacity-0 md:group-hover/tab:opacity-100 group-focus-within/tab:opacity-100"
+          } flex items-center gap-1 shrink-0 transition-opacity duration-150`}
         >
-          <button
+          <span
             onClick={handleCopyUrl}
             title="Copy URL"
-            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+            role="button"
+            tabIndex={0}
+            className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
               isDarkTheme
                 ? "text-white/70 hover:text-white hover:bg-white/20"
-                : "text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
             }`}
           >
             {copied ? (
-              <Check className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="material-symbols-outlined text-[15px] text-primary leading-none">check</span>
             ) : (
-              <Copy className="w-3.5 h-3.5" />
+              <span className="material-symbols-outlined text-[15px] leading-none">content_copy</span>
             )}
-          </button>
+          </span>
 
           <a
             href={tab.url}
             target="_blank"
             rel="noopener noreferrer"
             onClick={handleOpenLink}
-            title="Open URL in browser"
-            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+            title="Open in new tab"
+            className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
               isDarkTheme
                 ? "text-white/70 hover:text-white hover:bg-white/20"
-                : "text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
             }`}
           >
-            <ExternalLink className="w-3.5 h-3.5" />
+            <span className="material-symbols-outlined text-[15px] leading-none">open_in_new</span>
           </a>
         </div>
       )}
-    </div>
+    </button>
   );
 }

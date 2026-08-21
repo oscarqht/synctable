@@ -1,26 +1,8 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import {
-  Search,
-  Laptop,
-  Globe,
-  ChevronDown,
-  X,
-  Loader2,
-  RefreshCw,
-  AlertCircle,
-  HardDrive,
-  Sparkles,
-} from "lucide-react";
 import type { SynctableSyncResponse, BrowserTreeNode } from "../types";
-import {
-  countTabs,
-  countWorkspaces,
-  extractWorkspacesFromRoot,
-  formatRelativeTime,
-} from "../utils/treeUtils";
-import { ZenSidebarView } from "./zen/ZenSidebarView";
+import { countTabs } from "../utils/treeUtils";
 import { DeviceCard } from "./DeviceCard";
 
 export interface MultiDeviceCardsPortalProps {
@@ -30,6 +12,9 @@ export interface MultiDeviceCardsPortalProps {
   onOpenExternal?: (url: string) => void;
   onSaveToken?: (token: string) => Promise<void> | void;
   onSwitchToLocal?: () => void;
+  hideToolbar?: boolean;
+  searchQuery?: string;
+  selectedBrowser?: string;
 }
 
 export function MultiDeviceCardsPortal({
@@ -39,12 +24,18 @@ export function MultiDeviceCardsPortal({
   onOpenExternal,
   onSaveToken,
   onSwitchToLocal,
+  hideToolbar = false,
+  searchQuery: externalSearchQuery,
+  selectedBrowser: externalSelectedBrowser,
 }: MultiDeviceCardsPortalProps) {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("all");
-  const [selectedBrowser, setSelectedBrowser] = useState<string>("all");
-  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [internalSelectedBrowser, setInternalSelectedBrowser] = useState<string>("all");
+  const [internalSearchQuery, setInternalSearchQuery] = useState<string>("");
   const [tokenInput, setTokenInput] = useState<string>("");
   const [savingToken, setSavingToken] = useState<boolean>(false);
+
+  const searchQuery = externalSearchQuery !== undefined ? externalSearchQuery : internalSearchQuery;
+  const selectedBrowser = externalSelectedBrowser !== undefined ? externalSelectedBrowser : internalSelectedBrowser;
 
   // Compute valid devices with non-empty tabs
   const validDevices = useMemo(() => {
@@ -104,58 +95,58 @@ export function MultiDeviceCardsPortal({
   // 1. Loading State (when no data loaded yet or actively loading without existing data)
   if (!data || (loading && !data)) {
     return (
-      <div className="py-20 flex flex-col items-center justify-center space-y-4 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 my-6">
-        <Loader2 className="w-8 h-8 animate-spin text-cyan-600 dark:text-cyan-400" />
+      <div className="py-20 flex flex-col items-center justify-center space-y-4 bg-surface-container-lowest rounded-lg border border-surface-variant my-6">
+        <span className="material-symbols-outlined text-4xl animate-spin text-primary">
+          sync
+        </span>
         <div className="text-center space-y-1">
-          <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-            Locating Synctable collection & downloading tree snapshots...
+          <p className="font-title-md text-title-md font-bold text-on-surface">
+            Locating Synctable collection & downloading snapshots...
           </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Querying Raindrop.io REST API and parsing JSON files
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
+            Querying Raindrop.io REST API and parsing JSON workspace files
           </p>
         </div>
       </div>
     );
   }
 
-  // 2. Unauthenticated / Missing Token State (Desktop flow where onSaveToken is provided)
+  // 2. Unauthenticated / Missing Token State
   if (data.authenticated === false && onSaveToken) {
     return (
-      <div className="py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center max-w-lg mx-auto space-y-5 shadow-sm my-6">
-        <div className="w-14 h-14 rounded-2xl bg-cyan-50 dark:bg-cyan-950/60 border border-cyan-200 dark:border-cyan-800 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mx-auto text-2xl">
-          💧
+      <div className="py-16 px-8 bg-surface-container-lowest rounded-lg border border-surface-variant text-center max-w-lg mx-auto space-y-6 shadow-sm my-6">
+        <div className="w-14 h-14 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center mx-auto text-2xl">
+          <span className="material-symbols-outlined text-[28px]">key</span>
         </div>
         <div className="space-y-1.5">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+          <h3 className="font-title-md text-title-md font-bold text-on-surface">
             Raindrop.io API Token Required
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
             {data.error ||
               "Enter your Raindrop.io API Test Token below to connect and view browser workspaces from all your devices."}
           </p>
         </div>
 
-        <form onSubmit={handleTokenSubmit} className="space-y-3 text-left pt-2 max-w-sm mx-auto">
+        <form onSubmit={handleTokenSubmit} className="space-y-4 text-left pt-2 max-w-sm mx-auto">
           <div>
             <input
               type="password"
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
               placeholder="Paste Raindrop API test token here"
-              className="w-full px-3.5 py-2.5 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all text-slate-800 dark:text-slate-200"
+              className="w-full h-12 px-4 rounded-full bg-surface-container text-on-surface border-none focus:ring-2 focus:ring-primary-container font-body-sm placeholder:text-on-surface-variant"
             />
           </div>
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={savingToken || !tokenInput.trim()}
-              className="flex-1 flex items-center justify-center space-x-2 py-2.5 px-4 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 disabled:opacity-50 text-white dark:text-slate-900 font-medium text-xs shadow-sm transition-all"
+              className="flex-1 flex items-center justify-center gap-2 h-12 px-6 rounded-full bg-primary text-on-primary hover:bg-surface-tint disabled:opacity-50 font-label-md text-label-md transition-colors shadow-sm cursor-pointer"
             >
-              {savingToken ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400 dark:text-cyan-600" />
-              )}
+              <span className="material-symbols-outlined text-[18px]">
+                {savingToken ? "sync" : "dataset"}
+              </span>
               <span>Connect API Token</span>
             </button>
             {onRefresh && (
@@ -163,13 +154,15 @@ export function MultiDeviceCardsPortal({
                 type="button"
                 onClick={onRefresh}
                 disabled={loading}
-                className="px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-medium transition-all"
+                className="w-12 h-12 rounded-full border border-outline-variant flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors"
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+                <span className={`material-symbols-outlined text-[20px] ${loading ? "animate-spin" : ""}`}>
+                  refresh
+                </span>
               </button>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
+          <p className="font-label-md text-label-md text-on-surface-variant text-center">
             Get your token from{" "}
             <a
               href="https://app.raindrop.io/settings/integrations"
@@ -181,7 +174,7 @@ export function MultiDeviceCardsPortal({
                   onOpenExternal("https://app.raindrop.io/settings/integrations");
                 }
               }}
-              className="text-cyan-600 dark:text-cyan-400 hover:underline"
+              className="text-primary font-bold hover:underline"
             >
               Raindrop.io Settings → Integrations
             </a>
@@ -191,18 +184,18 @@ export function MultiDeviceCardsPortal({
     );
   }
 
-  // 3. Error State (or unauthenticated state when onSaveToken is not present)
+  // 3. Error State
   if ((data.authenticated === false && !onSaveToken) || (data.error && validDevices.length === 0 && !data.collection)) {
     return (
-      <div className="py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-rose-200 dark:border-rose-900/60 text-center max-w-lg mx-auto space-y-5 shadow-sm my-6">
-        <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200 dark:border-rose-800 flex items-center justify-center text-rose-600 dark:text-rose-400 mx-auto">
-          <AlertCircle className="w-7 h-7" />
+      <div className="py-16 px-8 bg-surface-container-lowest rounded-lg border border-error/30 text-center max-w-lg mx-auto space-y-6 shadow-sm my-6">
+        <div className="w-14 h-14 rounded-full bg-error-container text-on-error-container flex items-center justify-center mx-auto">
+          <span className="material-symbols-outlined text-[28px]">error</span>
         </div>
         <div className="space-y-1.5">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+          <h3 className="font-title-md text-title-md font-bold text-on-surface">
             {data.authenticated === false ? "Authentication Required" : "Failed to Load Raindrop Snapshots"}
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
             {data.error || "Please log in again to access your Synctable workspaces."}
           </p>
         </div>
@@ -212,9 +205,11 @@ export function MultiDeviceCardsPortal({
               type="button"
               onClick={onRefresh}
               disabled={loading}
-              className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium shadow-sm transition-all"
+              className="flex items-center gap-2 px-6 h-12 rounded-full bg-primary text-on-primary hover:bg-surface-tint font-label-md text-label-md transition-colors shadow-sm"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <span className={`material-symbols-outlined text-[18px] ${loading ? "animate-spin" : ""}`}>
+                refresh
+              </span>
               <span>Try Again</span>
             </button>
           </div>
@@ -223,78 +218,81 @@ export function MultiDeviceCardsPortal({
     );
   }
 
-  // 3. No Synctable Collection Found State
+  // 4. No Synctable Collection Found State
   if (!data?.collection) {
     return (
-      <div className="py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center max-w-2xl mx-auto space-y-6 shadow-sm my-6">
-        <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 flex items-center justify-center text-amber-600 dark:text-amber-400 mx-auto">
-          <AlertCircle className="w-7 h-7" />
+      <div className="py-16 px-8 bg-surface-container-lowest rounded-lg border border-surface-variant text-center max-w-2xl mx-auto space-y-6 shadow-sm my-6">
+        <div className="w-14 h-14 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center mx-auto">
+          <span className="material-symbols-outlined text-[28px]">folder_open</span>
         </div>
         <div className="space-y-2">
-          <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+          <h3 className="font-headline-lg text-headline-lg font-bold text-on-surface">
             No &quot;Synctable&quot; Collection Found in Raindrop
           </h3>
-          <p className="text-sm text-slate-600 dark:text-slate-400 max-w-lg mx-auto">
+          <p className="font-body-sm text-body-sm text-on-surface-variant max-w-lg mx-auto">
             We could not find a collection named <strong>Synctable</strong> in your Raindrop
             account. Follow these quick steps to upload your first snapshot:
           </p>
         </div>
 
         {/* Instruction Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-1">
-            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-left">
+          <div className="p-4 rounded-lg bg-surface-container-low border border-surface-variant space-y-1">
+            <span className="font-label-md text-label-md font-bold text-primary px-2 py-0.5 rounded bg-primary-container/20">
               STEP 1
             </span>
-            <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200 pt-1">
+            <h4 className="font-title-md text-title-md font-bold text-on-surface pt-1">
               Open Current Device
             </h4>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
               Switch to the Current Device tab.
             </p>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-1">
-            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+          <div className="p-4 rounded-lg bg-surface-container-low border border-surface-variant space-y-1">
+            <span className="font-label-md text-label-md font-bold text-primary px-2 py-0.5 rounded bg-primary-container/20">
               STEP 2
             </span>
-            <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200 pt-1">
+            <h4 className="font-title-md text-title-md font-bold text-on-surface pt-1">
               Set Raindrop Token
             </h4>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Paste your token in Settings dialog.
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
+              Paste your token in Preferences dialog.
             </p>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-950 border border-slate-200/80 dark:border-slate-800 space-y-1">
-            <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 px-1.5 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+          <div className="p-4 rounded-lg bg-surface-container-low border border-surface-variant space-y-1">
+            <span className="font-label-md text-label-md font-bold text-primary px-2 py-0.5 rounded bg-primary-container/20">
               STEP 3
             </span>
-            <h4 className="text-xs font-semibold text-slate-800 dark:text-slate-200 pt-1">
+            <h4 className="font-title-md text-title-md font-bold text-on-surface pt-1">
               Click Sync Now
             </h4>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="font-body-sm text-body-sm text-on-surface-variant">
               Trigger a sync to upload snapshot.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-4 pt-2">
           {onSwitchToLocal && (
             <button
               onClick={onSwitchToLocal}
-              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-medium shadow-sm transition-all"
+              className="flex items-center gap-2 px-6 h-12 rounded-full border border-outline-variant bg-surface hover:bg-surface-container-low font-label-md text-label-md text-on-surface transition-colors"
             >
-              <span>💻 Go to Current Device</span>
+              <span className="material-symbols-outlined text-[18px]">laptop_mac</span>
+              <span>Current Device</span>
             </button>
           )}
           {onRefresh && (
             <button
               onClick={onRefresh}
               disabled={loading}
-              className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium shadow-sm transition-all active:scale-95"
+              className="flex items-center gap-2 px-6 h-12 rounded-full bg-primary text-on-primary hover:bg-surface-tint font-label-md text-label-md transition-colors shadow-sm"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <span className={`material-symbols-outlined text-[18px] ${loading ? "animate-spin" : ""}`}>
+                refresh
+              </span>
               <span>Check Raindrop Again</span>
             </button>
           )}
@@ -303,38 +301,41 @@ export function MultiDeviceCardsPortal({
     );
   }
 
-  // 4. Collection Found But 0 Valid Items State
+  // 5. Collection Found But 0 Valid Items State
   if (validDevices.length === 0) {
     return (
-      <div className="py-16 px-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center max-w-lg mx-auto space-y-5 shadow-sm my-6">
-        <div className="w-14 h-14 rounded-2xl bg-cyan-50 dark:bg-cyan-950/60 border border-cyan-200 dark:border-cyan-800 flex items-center justify-center text-cyan-600 dark:text-cyan-400 mx-auto">
-          <HardDrive className="w-7 h-7" />
+      <div className="py-16 px-8 bg-surface-container-lowest rounded-lg border border-surface-variant text-center max-w-lg mx-auto space-y-6 shadow-sm my-6">
+        <div className="w-14 h-14 rounded-full bg-primary-container text-on-primary-container flex items-center justify-center mx-auto">
+          <span className="material-symbols-outlined text-[28px]">devices</span>
         </div>
         <div className="space-y-1.5">
-          <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
+          <h3 className="font-title-md text-title-md font-bold text-on-surface">
             Collection &quot;Synctable&quot; is Empty
           </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            The root collection was found, but no non-empty device snapshots have been uploaded yet.
-            Trigger a sync from your Synctable desktop daemon.
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
+            The root collection was found, but no device snapshots have been uploaded yet.
+            Trigger a sync from your Synctable desktop app.
           </p>
         </div>
         <div className="flex items-center justify-center gap-3">
           {onSwitchToLocal && (
             <button
               onClick={onSwitchToLocal}
-              className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-100 text-white dark:text-slate-900 text-xs font-medium shadow-sm transition-all"
+              className="flex items-center gap-2 px-6 h-12 rounded-full border border-outline-variant bg-surface hover:bg-surface-container-low font-label-md text-label-md text-on-surface transition-colors"
             >
-              <span>💻 Sync Current Device</span>
+              <span className="material-symbols-outlined text-[18px]">laptop_mac</span>
+              <span>Current Device</span>
             </button>
           )}
           {onRefresh && (
             <button
               onClick={onRefresh}
               disabled={loading}
-              className="inline-flex items-center space-x-2 px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium shadow-sm transition-all"
+              className="flex items-center gap-2 px-6 h-12 rounded-full bg-primary text-on-primary hover:bg-surface-tint font-label-md text-label-md transition-colors shadow-sm"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+              <span className={`material-symbols-outlined text-[18px] ${loading ? "animate-spin" : ""}`}>
+                refresh
+              </span>
               <span>Refresh</span>
             </button>
           )}
@@ -343,92 +344,124 @@ export function MultiDeviceCardsPortal({
     );
   }
 
-  // 5. Main Multi-Device Portal View
+  // 6. Main Multi-Device Portal View
   return (
-    <div className="space-y-5">
-      {/* Search & Filter Toolbar */}
-      <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs flex flex-col md:flex-row items-stretch md:items-center gap-3">
-        {/* Search Input */}
-        <div className="relative flex-1 min-w-0">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search tabs, URLs, or workspaces across all devices..."
-            className="w-full pl-9 pr-8 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5"
-              title="Clear search"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+    <div className="flex flex-col gap-10 w-full">
+      {/* Global Search & Context Bar */}
+      {!hideToolbar && (
+        <div className="flex flex-row items-center gap-2 md:gap-4 w-full">
+          {/* Search Input */}
+          <div className="flex-1 min-w-0 relative">
+            <span className="material-symbols-outlined absolute left-3 md:left-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] md:text-[20px] pointer-events-none">
+              search
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => {
+                if (externalSearchQuery === undefined) {
+                  setInternalSearchQuery(e.target.value);
+                }
+              }}
+              placeholder="Search tabs, URLs, or workspaces across all devices..."
+              className="w-full h-10 md:h-12 pl-9 md:pl-12 pr-8 md:pr-10 rounded-full bg-surface-container text-on-surface border-none focus:ring-2 focus:ring-primary-container font-body-sm md:font-body-lg text-sm md:text-base placeholder:text-on-surface-variant transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => {
+                  if (externalSearchQuery === undefined) {
+                    setInternalSearchQuery("");
+                  }
+                }}
+                className="absolute right-2.5 md:right-4 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface p-1"
+                title="Clear search"
+              >
+                <span className="material-symbols-outlined text-[16px] md:text-[20px]">close</span>
+              </button>
+            )}
+          </div>
 
-        {/* Filter Dropdowns & Refresh */}
-        <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
-          {/* Devices Dropdown */}
-          <div className="relative flex-1 sm:flex-initial min-w-[150px]">
-            <Laptop className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <select
-              value={selectedDeviceId}
-              onChange={(e) => setSelectedDeviceId(e.target.value)}
-              className="w-full pl-8 pr-8 py-2 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all appearance-none cursor-pointer truncate"
-              title="Filter by Device"
-            >
-              <option value="all">All Devices ({validDevices.length})</option>
-              {validDevices.map((device) => {
-                const tabs = device.tree.reduce((acc, t) => acc + countTabs(t), 0);
-                return (
-                  <option key={device.deviceId} value={device.deviceId}>
-                    {device.deviceName} ({tabs} tabs)
+          {/* Filter Dropdowns & Refresh */}
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            {/* Devices Dropdown */}
+            <label className="relative shrink-0 flex items-center justify-center w-10 h-10 md:w-auto md:h-12 rounded-full border border-outline-variant bg-surface hover:bg-surface-container-low transition-colors cursor-pointer" title="Filter by Device">
+              <span className="material-symbols-outlined text-[20px] md:text-[18px] text-on-surface-variant md:absolute md:left-4 md:top-1/2 md:-translate-y-1/2 pointer-events-none select-none">
+                laptop_mac
+              </span>
+
+              <select
+                value={selectedDeviceId}
+                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                className="opacity-0 md:opacity-100 absolute inset-0 w-full h-full md:static md:w-auto md:h-full md:pl-11 md:pr-10 md:min-w-[170px] md:bg-transparent font-label-md text-label-md text-on-surface appearance-none cursor-pointer truncate select-none"
+              >
+                <option value="all">All Devices ({validDevices.length})</option>
+                {validDevices.map((device) => {
+                  const tabs = device.tree.reduce((acc, t) => acc + countTabs(t), 0);
+                  return (
+                    <option key={device.deviceId} value={device.deviceId}>
+                      {device.deviceName} ({tabs} tabs)
+                    </option>
+                  );
+                })}
+              </select>
+
+              <span className="hidden md:inline-block pointer-events-none">
+                <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] select-none">
+                  expand_more
+                </span>
+              </span>
+            </label>
+
+            {/* Browsers Dropdown */}
+            <label className="relative shrink-0 flex items-center justify-center w-10 h-10 md:w-auto md:h-12 rounded-full border border-outline-variant bg-surface hover:bg-surface-container-low transition-colors cursor-pointer" title="Filter by Browser">
+              <span className="material-symbols-outlined text-[20px] md:text-[18px] text-on-surface-variant md:absolute md:left-4 md:top-1/2 md:-translate-y-1/2 pointer-events-none select-none">
+                language
+              </span>
+
+              <select
+                value={selectedBrowser}
+                onChange={(e) => {
+                  if (externalSelectedBrowser === undefined) {
+                    setInternalSelectedBrowser(e.target.value);
+                  }
+                }}
+                className="opacity-0 md:opacity-100 absolute inset-0 w-full h-full md:static md:w-auto md:h-full md:pl-11 md:pr-10 md:min-w-[160px] md:bg-transparent font-label-md text-label-md text-on-surface appearance-none cursor-pointer truncate select-none"
+              >
+                <option value="all">All Browsers</option>
+                {availableBrowsers.map((b) => (
+                  <option key={b} value={b}>
+                    {b.toUpperCase()} Browser
                   </option>
-                );
-              })}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+                ))}
+              </select>
 
-          {/* Browsers Dropdown */}
-          <div className="relative flex-1 sm:flex-initial min-w-[130px]">
-            <Globe className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <select
-              value={selectedBrowser}
-              onChange={(e) => setSelectedBrowser(e.target.value)}
-              className="w-full pl-8 pr-8 py-2 text-xs font-medium bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 focus:outline-hidden focus:ring-2 focus:ring-cyan-500/20 focus:border-cyan-500 transition-all appearance-none cursor-pointer truncate"
-              title="Filter by Browser"
-            >
-              <option value="all">All Browsers</option>
-              {availableBrowsers.map((b) => (
-                <option key={b} value={b}>
-                  {b.toUpperCase()}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
+              <span className="hidden md:inline-block pointer-events-none">
+                <span className="material-symbols-outlined absolute right-4 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] select-none">
+                  expand_more
+                </span>
+              </span>
+            </label>
 
-          {/* Refresh Button */}
-          {onRefresh && (
-            <button
-              onClick={onRefresh}
-              disabled={loading}
-              className="flex items-center space-x-1.5 py-2 px-3.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs shadow-xs transition-all active:scale-95"
-              title="Refresh Cloud Snapshots"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-              <span>Refresh</span>
-            </button>
-          )}
+            {/* Refresh Button */}
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                disabled={loading}
+                className="flex items-center justify-center gap-2 w-10 h-10 md:w-auto md:px-6 md:h-12 rounded-full bg-primary text-on-primary hover:bg-surface-tint transition-colors font-label-md text-label-md shadow-sm shrink-0 cursor-pointer"
+                title="Refresh Snapshots"
+              >
+                <span className={`material-symbols-outlined text-[18px] md:text-[20px] ${loading ? "animate-spin" : ""}`}>
+                  refresh
+                </span>
+                <span className="hidden md:inline">Refresh</span>
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Device Trees / Zen Sidebars View Container */}
-      <div className="space-y-6">
+      {/* Device Cards List */}
+      <div className="space-y-12">
         {visibleDevices.map((device) => (
           <DeviceCard
             key={device.deviceId}

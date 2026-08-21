@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Laptop } from "lucide-react";
 import type { BrowserTreeNode } from "../types";
 import {
   countTabs,
@@ -118,90 +117,87 @@ export function DeviceCard({
       : "No tree snapshots match the current filters.");
 
   return (
-    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
-      {/* Device Tree Header Banner */}
-      <div className="bg-slate-50/90 dark:bg-slate-950/90 px-4 py-3 border-b border-slate-200/80 dark:border-slate-800 flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-7 h-7 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center text-indigo-700 dark:text-indigo-300">
-            <Laptop className="w-4 h-4" />
-          </div>
-          <div>
-            <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              {deviceName}
-              {badge && (
-                <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800 px-1.5 py-0.2 rounded font-mono">
-                  {badge}
-                </span>
-              )}
-            </h2>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400">
-              {lastUpdatedLabel} {lastUpdated ? formatRelativeTime(lastUpdated) : "Never"} &middot;{" "}
-              {deviceTabsCount} {deviceTabsCount === 1 ? "tab" : "tabs"} &middot;{" "}
-              {deviceWorkspacesCount} {deviceWorkspacesCount === 1 ? "workspace" : "workspaces"}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          {deviceBrowsers.map((b) => (
-            <span
-              key={b}
-              className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 shadow-2xs"
-            >
-              {b}
+    <div className="flex flex-col gap-8 w-full">
+      {/* Dashboard Header */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3 text-on-surface-variant flex-wrap">
+          <span className="material-symbols-outlined bg-surface-container-high text-on-surface p-2 rounded-lg">
+            laptop_mac
+          </span>
+          <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface">
+            {deviceName}
+          </h2>
+          {badge && (
+            <span className="px-3 py-1 rounded bg-surface-container-high font-label-md text-label-md text-on-surface-variant font-mono">
+              {badge}
             </span>
-          ))}
+          )}
+          {deviceBrowsers.length > 0 && (
+            <div className="ml-auto flex items-center gap-2">
+              {deviceBrowsers.map((b) => (
+                <span
+                  key={b}
+                  className="px-3 py-1 rounded-full border border-outline-variant font-label-md text-label-md font-bold uppercase text-on-surface"
+                >
+                  {b}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
+        <p className="font-body-sm text-body-sm text-on-surface-variant">
+          {lastUpdatedLabel} {lastUpdated ? formatRelativeTime(lastUpdated) : "Never"} · {deviceTabsCount} {deviceTabsCount === 1 ? "tab" : "tabs"} · {deviceWorkspacesCount} {deviceWorkspacesCount === 1 ? "workspace" : "workspaces"}
+        </p>
       </div>
 
-      {/* Content Area: Zen Sidebar View */}
-      <div className="p-4 space-y-4">
-        {filteredRoots.length === 0 ? (
-          <div className="py-8 text-center text-xs text-slate-400">
-            {resolvedEmptyMessage}
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {browserGroups.map(([browserName, browserTrees]) => {
-              const workspaces = browserTrees.flatMap(extractWorkspacesFromRoot);
-              if (workspaces.length === 0) return null;
-              const browserLastUpdateTime = getBrowserLastUpdateTime(browserTrees);
+      {/* Content Area: Workspaces per Browser */}
+      {filteredRoots.length === 0 ? (
+        <div className="py-12 px-6 bg-surface-container-lowest border border-surface-variant rounded-lg text-center font-body-sm text-body-sm text-on-surface-variant">
+          {resolvedEmptyMessage}
+        </div>
+      ) : (
+        <div className="space-y-10">
+          {browserGroups.map(([browserName, browserTrees]) => {
+            const workspaces = browserTrees.flatMap(extractWorkspacesFromRoot);
+            if (workspaces.length === 0) return null;
+            const browserLastUpdateTime = getBrowserLastUpdateTime(browserTrees);
 
-              return (
-                <div key={browserName} className="space-y-3">
-                  <div className="flex items-center justify-between px-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
-                        {browserName}
-                      </span>
-                      <span className="text-[11px] font-medium text-slate-400">
-                        ({workspaces.length}{" "}
-                        {workspaces.length === 1 ? "workspace" : "workspaces"})
-                      </span>
-                    </div>
-                    {browserLastUpdateTime && (
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        Updated {formatRelativeTime(browserLastUpdateTime)}
-                      </span>
-                    )}
+            return (
+              <div key={browserName} className="space-y-6">
+                {/* Section Title */}
+                <div className="flex justify-between items-end border-b border-surface-container-high pb-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-title-md text-title-md font-bold uppercase text-on-surface">
+                      {browserName} Workspaces
+                    </h3>
+                    <span className="font-body-sm text-body-sm text-on-surface-variant">
+                      ({workspaces.length} {workspaces.length === 1 ? "workspace" : "workspaces"})
+                    </span>
                   </div>
-                  {/* Arrange each workspace as a separate card in the grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
-                    {workspaces.map((wsItem) => (
-                      <ZenSidebarView
-                        key={wsItem.id}
-                        workspaceItem={wsItem}
-                        searchQuery={searchQuery}
-                        onOpenExternal={onOpenExternal}
-                      />
-                    ))}
-                  </div>
+                  {browserLastUpdateTime && (
+                    <span className="font-body-sm text-body-sm text-outline">
+                      Updated {formatRelativeTime(browserLastUpdateTime)}
+                    </span>
+                  )}
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+
+                {/* Workspace Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1500px]:grid-cols-5 2xl:grid-cols-5 gap-gutter items-start">
+                  {workspaces.map((wsItem, wsIndex) => (
+                    <ZenSidebarView
+                      key={wsItem.id}
+                      workspaceItem={wsItem}
+                      cardIndex={wsIndex}
+                      searchQuery={searchQuery}
+                      onOpenExternal={onOpenExternal}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

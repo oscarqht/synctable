@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Search, X, Copy, Check, ExternalLink } from "lucide-react";
 import type { BrowserTreeNode, WorkspaceItem } from "../../types";
 import {
   countTabs,
@@ -21,6 +20,7 @@ export interface ZenSidebarViewProps {
   searchQuery?: string;
   isSingleColumn?: boolean;
   alwaysShowActions?: boolean;
+  cardIndex?: number;
   onOpenExternal?: (url: string) => void;
 }
 
@@ -30,6 +30,7 @@ export function ZenSidebarView({
   searchQuery: externalSearch = "",
   isSingleColumn = false,
   alwaysShowActions = false,
+  cardIndex = 0,
   onOpenExternal,
 }: ZenSidebarViewProps) {
   const [internalSearch, setInternalSearch] = useState("");
@@ -98,12 +99,31 @@ export function ZenSidebarView({
     return false;
   }
 
-  const isDark = Boolean(
+  const hasExplicitColor = Boolean(
     (currentWorkspaceItem?.themeColors &&
-      currentWorkspaceItem.themeColors.length > 0 &&
-      isDarkColor(currentWorkspaceItem.themeColors[0])) ||
-      (currentWorkspaceItem?.themeColor &&
-        isDarkColor(currentWorkspaceItem.themeColor))
+      currentWorkspaceItem.themeColors.length > 0) ||
+      currentWorkspaceItem?.themeColor
+  );
+
+  // Archetype rotation when no custom hex color is specified
+  const archetype = useMemo<"neutral" | "primary" | "secondary" | "tertiary">(() => {
+    const archetypes: Array<"neutral" | "primary" | "secondary" | "tertiary"> = [
+      "neutral",
+      "primary",
+      "secondary",
+      "tertiary",
+    ];
+    return archetypes[cardIndex % archetypes.length];
+  }, [cardIndex]);
+
+  const isDark = Boolean(
+    hasExplicitColor
+      ? (currentWorkspaceItem?.themeColors &&
+          currentWorkspaceItem.themeColors.length > 0 &&
+          isDarkColor(currentWorkspaceItem.themeColors[0])) ||
+        (currentWorkspaceItem?.themeColor &&
+          isDarkColor(currentWorkspaceItem.themeColor))
+      : false
   );
 
   const handleSelectTab = (tab: BrowserTreeNode) => {
@@ -138,6 +158,8 @@ export function ZenSidebarView({
     }
   };
 
+  const isCardDarkOrColored = hasExplicitColor ? isDark : archetype !== "neutral";
+
   const renderItem = (item: BrowserTreeNode, idx: number) => {
     if (item.node_type === "folder") {
       return (
@@ -145,7 +167,7 @@ export function ZenSidebarView({
           key={item.id || `folder_${idx}`}
           folder={item}
           activeTabId={activeTabId}
-          isDarkTheme={isDark}
+          isDarkTheme={isCardDarkOrColored}
           isSingleColumn={isSingleColumn}
           alwaysShowActions={alwaysShowActions}
           onSelectTab={handleSelectTab}
@@ -160,7 +182,7 @@ export function ZenSidebarView({
           key={item.id || `split_${idx}`}
           node={item}
           activeTabId={activeTabId}
-          isDarkTheme={isDark}
+          isDarkTheme={isCardDarkOrColored}
           isSingleColumn={isSingleColumn}
           alwaysShowActions={alwaysShowActions}
           onSelectTab={handleSelectTab}
@@ -175,7 +197,7 @@ export function ZenSidebarView({
         tab={item}
         isPinned={item.node_type === "pinned_tab"}
         isActive={activeTabId === item.id}
-        isDarkTheme={isDark}
+        isDarkTheme={isCardDarkOrColored}
         isSingleColumn={isSingleColumn}
         alwaysShowActions={alwaysShowActions}
         onSelect={handleSelectTab}
@@ -191,171 +213,148 @@ export function ZenSidebarView({
   const { browserTitle, profileName, workspaceTitle, tabCount } =
     currentWorkspaceItem;
 
-  const hasThemeBg = Boolean(
-    (currentWorkspaceItem.themeColors &&
-      currentWorkspaceItem.themeColors.length > 0) ||
-      currentWorkspaceItem.themeColor
-  );
+  const displayTitle =
+    workspaceTitle && workspaceTitle !== "Workspace" && workspaceTitle !== "Main Window"
+      ? workspaceTitle
+      : browserTitle;
 
-  const themeBgStyle = getWorkspaceGradientStyle(
-    currentWorkspaceItem.themeColors,
-    currentWorkspaceItem.themeColor,
-    isDark
-  );
+  const customBgStyle = hasExplicitColor
+    ? getWorkspaceGradientStyle(
+        currentWorkspaceItem.themeColors,
+        currentWorkspaceItem.themeColor,
+        isDark
+      )
+    : undefined;
+
+  // Resolve card container styling
+  let containerClasses = "";
+  let badgeClasses = "";
+  let searchInputClasses = "";
+  let headerActionClasses = "";
+
+  if (hasExplicitColor) {
+    containerClasses = `rounded-lg p-6 flex flex-col gap-6 shadow-sm hover:shadow-md transition-all duration-300 border ${
+      isDark
+        ? "border-white/20 text-white"
+        : "border-black/[0.08] dark:border-white/10 text-on-surface"
+    }`;
+    badgeClasses = isDark
+      ? "bg-white/30 text-white"
+      : "bg-surface-container font-label-md text-label-md text-on-surface-variant";
+    searchInputClasses = isDark
+      ? "bg-white/20 text-white placeholder:text-white/70 focus:ring-white"
+      : "bg-surface-container-low text-on-surface placeholder:text-on-surface-variant focus:ring-outline";
+    headerActionClasses = isDark
+      ? "text-white/80 hover:text-white"
+      : "text-on-surface-variant hover:text-on-surface";
+  } else if (archetype === "primary") {
+    containerClasses =
+      "bg-primary-container text-on-primary-container rounded-lg p-6 flex flex-col gap-6 shadow-sm hover:-translate-y-1 transition-transform duration-300";
+    badgeClasses = "bg-white/30 text-on-primary-container";
+    searchInputClasses =
+      "bg-white/20 text-on-primary-container placeholder:text-on-primary-container/70 focus:ring-white";
+    headerActionClasses = "opacity-80 hover:opacity-100";
+  } else if (archetype === "secondary") {
+    containerClasses =
+      "bg-secondary-container text-on-secondary-container rounded-lg p-6 flex flex-col gap-6 shadow-sm hover:-translate-y-1 transition-transform duration-300";
+    badgeClasses = "bg-white/40 text-on-secondary-container";
+    searchInputClasses =
+      "bg-white/40 text-on-secondary-container placeholder:text-on-secondary-container/70 focus:ring-white";
+    headerActionClasses = "opacity-80 hover:opacity-100";
+  } else if (archetype === "tertiary") {
+    containerClasses =
+      "bg-tertiary-container text-on-tertiary-container rounded-lg p-6 flex flex-col gap-6 shadow-sm hover:-translate-y-1 transition-transform duration-300";
+    badgeClasses = "bg-white/30 text-on-tertiary-container";
+    searchInputClasses =
+      "bg-white/20 text-on-tertiary-container placeholder:text-on-tertiary-container/70 focus:ring-white";
+    headerActionClasses = "opacity-80 hover:opacity-100";
+  } else {
+    // Neutral archetype
+    containerClasses =
+      "bg-surface-container-lowest border border-surface-variant text-on-surface rounded-lg p-6 flex flex-col gap-6 shadow-sm hover:shadow-md transition-shadow duration-300";
+    badgeClasses = "bg-surface-container text-on-surface-variant";
+    searchInputClasses =
+      "bg-surface-container-low text-on-surface placeholder:text-on-surface-variant focus:ring-outline";
+    headerActionClasses = "text-on-surface-variant hover:text-on-surface";
+  }
 
   return (
-    <div
-      style={themeBgStyle}
-      className={`flex flex-col rounded-3xl p-3 sm:p-4 shadow-sm w-full transition-all ${
-        hasThemeBg
-          ? isDark
-            ? "border border-white/20 shadow-md shadow-black/10"
-            : "border border-black/[0.08] dark:border-white/10 shadow-sm shadow-slate-900/5"
-          : "border border-gray-300 dark:border-gray-600 bg-slate-100/90 dark:bg-slate-900/90"
-      }`}
-    >
-      {/* Top Controls: Browser & Profile Info + Action Buttons + Tab Count */}
-      <div className="flex items-center justify-between w-full pb-2 mb-2">
-        <div className="flex items-center gap-2 min-w-0 px-1">
-          <span
-            className={`text-xs font-bold capitalize truncate ${
-              isDark
-                ? "text-white"
-                : hasThemeBg
-                ? "text-slate-900 dark:text-slate-100"
-                : "text-slate-800 dark:text-slate-200"
-            }`}
-          >
-            {browserTitle}
-          </span>
+    <div style={customBgStyle} className={containerClasses}>
+      {/* Top Header */}
+      <div className="flex justify-between items-center">
+        <div className="flex items-center gap-2 min-w-0 pr-2">
+          {currentWorkspaceItem.icon && (
+            <span className="text-lg shrink-0">{currentWorkspaceItem.icon}</span>
+          )}
+          <h4 className="font-title-md text-title-md font-bold truncate">
+            {displayTitle}
+          </h4>
           {profileName && profileName !== "Default" && (
-            <span
-              className={`text-[10px] font-medium truncate max-w-[120px] px-1.5 py-0.5 rounded ${
-                isDark
-                  ? "text-white/80 bg-white/15"
-                  : hasThemeBg
-                  ? "text-slate-600 dark:text-slate-300 bg-white/40 dark:bg-white/10"
-                  : "text-slate-400 dark:text-slate-500"
-              }`}
-            >
+            <span className="text-[11px] opacity-70 truncate max-w-[90px]">
               ({profileName})
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+
+        <div className="flex items-center gap-2 shrink-0">
           <button
+            type="button"
             onClick={handleCopyAll}
-            title="Copy all tab URLs in workspace"
-            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
-              isDark
-                ? "text-white/70 hover:text-white hover:bg-white/20"
-                : hasThemeBg
-                ? "text-slate-600 dark:text-slate-300 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-white/40 dark:hover:bg-white/10"
-                : "text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
-            }`}
+            title="Copy all URLs in workspace"
+            className={`${headerActionClasses} transition-opacity p-0.5 rounded`}
           >
             {copied ? (
-              <Check className="w-3.5 h-3.5 text-emerald-500" />
+              <span className="material-symbols-outlined text-[18px] text-primary">check</span>
             ) : (
-              <Copy className="w-3.5 h-3.5" />
+              <span className="material-symbols-outlined text-[18px]">content_copy</span>
             )}
           </button>
+
           <button
+            type="button"
             onClick={handleOpenAll}
-            title="Open all tabs in workspace"
-            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
-              isDark
-                ? "text-white/70 hover:text-white hover:bg-white/20"
-                : hasThemeBg
-                ? "text-slate-600 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-white/40 dark:hover:bg-white/10"
-                : "text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
-            }`}
+            title="Open all tabs in browser"
+            className={`${headerActionClasses} transition-opacity p-0.5 rounded`}
           >
-            <ExternalLink className="w-3.5 h-3.5" />
+            <span className="material-symbols-outlined text-[18px]">open_in_new</span>
           </button>
-          <span
-            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-              isDark
-                ? "text-white/90 bg-white/20 border border-white/20"
-                : hasThemeBg
-                ? "text-slate-700 dark:text-slate-200 bg-white/50 dark:bg-black/20 border border-white/40 dark:border-white/10 shadow-xs"
-                : "text-slate-500 dark:text-slate-400 bg-slate-200/60 dark:bg-slate-800/60"
-            }`}
-          >
+
+          <span className={`px-2 py-1 rounded-full font-label-md text-label-md font-bold ${badgeClasses}`}>
             {tabCount} {tabCount === 1 ? "tab" : "tabs"}
           </span>
         </div>
       </div>
 
-      {/* Search Input */}
+      {/* Card Search Bar */}
       {!externalSearch && (
-        <div className="relative mb-3 w-full">
-          <Search
-            className={`w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 ${
-              isDark
-                ? "text-white/60"
-                : hasThemeBg
-                ? "text-slate-500"
-                : "text-slate-400"
-            }`}
-          />
+        <div className="relative">
+          <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 opacity-70 text-[18px] pointer-events-none">
+            search
+          </span>
           <input
             type="text"
             value={internalSearch}
             onChange={(e) => setInternalSearch(e.target.value)}
             placeholder="Search tabs..."
-            className={`w-full pl-8 pr-7 py-1.5 text-xs rounded-xl focus:outline-hidden focus:ring-1.5 transition-all ${
-              isDark
-                ? "bg-white/15 border border-white/20 text-white placeholder:text-white/60 focus:bg-white/25 focus:ring-white/40"
-                : hasThemeBg
-                ? "bg-white/55 backdrop-blur-xs border border-white/50 text-slate-800 placeholder:text-slate-500/70 focus:bg-white/80 focus:border-white/80 focus:ring-black/10"
-                : "bg-white/70 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800 text-slate-800 dark:border-slate-200 placeholder:text-slate-400 focus:ring-cyan-500"
-            }`}
+            className={`w-full border-none rounded-full py-2 pl-10 pr-7 font-body-sm text-body-sm focus:ring-1 focus:outline-none transition-all ${searchInputClasses}`}
           />
           {internalSearch && (
             <button
+              type="button"
               onClick={() => setInternalSearch("")}
-              className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 ${
-                isDark
-                  ? "text-white/60 hover:text-white"
-                  : "text-slate-400 hover:text-slate-600"
-              }`}
+              className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 opacity-70 hover:opacity-100 text-[16px] p-0.5"
             >
-              <X className="w-3 h-3" />
+              close
             </button>
           )}
         </div>
       )}
 
-      {/* 1. Clean Workspace Label */}
-      {workspaceTitle && (
-        <div className="px-3.5 pt-1 pb-1 select-none">
-          <span
-            className={`text-xs sm:text-[13px] font-semibold tracking-tight flex items-center gap-1.5 ${
-              isDark
-                ? "text-white/90"
-                : hasThemeBg
-                ? "text-slate-700 dark:text-slate-200"
-                : "text-slate-500/80 dark:text-slate-400/80"
-            }`}
-          >
-            {currentWorkspaceItem.icon && (
-              <span className="text-sm">{currentWorkspaceItem.icon}</span>
-            )}
-            <span>{workspaceTitle}</span>
-          </span>
-        </div>
-      )}
-
-      {/* 2. Tab and Folder List */}
-      <div className="flex-1 w-full space-y-1 my-1">
+      {/* Tab and Folder List */}
+      <div className="flex flex-col gap-1">
         {filteredItems.length === 0 ? (
-          <div
-            className={`py-6 text-center text-xs ${
-              isDark ? "text-white/70" : "text-slate-400"
-            }`}
-          >
-            No tabs in this workspace
+          <div className="py-4 text-center text-xs opacity-60">
+            No matching tabs
           </div>
         ) : (
           filteredItems.map((item, idx) => {
@@ -368,12 +367,11 @@ export function ZenSidebarView({
               <React.Fragment key={item.id || `item_${idx}`}>
                 {renderItem(item, idx)}
                 {showDivider && (
-                  <div className="my-2 border-b border-black/20 mx-1.5" />
+                  <div className="my-2 border-b border-current opacity-15 mx-1.5" />
                 )}
               </React.Fragment>
             );
           })
-
         )}
       </div>
     </div>

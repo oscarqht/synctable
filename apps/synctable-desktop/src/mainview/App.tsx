@@ -1,15 +1,12 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Settings, RefreshCw, Sparkles, Laptop, Cloud } from "lucide-react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import type {
   BrowserTreeNode,
   SyncStats,
   SynctableSyncResponse,
-  RaindropUserProfile,
 } from "@synctable/ui";
 import { MultiDeviceCardsPortal, countTabs } from "@synctable/ui";
 import { LocalTab } from "./LocalTab";
 import { SettingsModal } from "./SettingsModal";
-import type { SynctableRPCSchema } from "../shared/types";
 
 interface AppProps {
   rpc: any;
@@ -23,6 +20,9 @@ export function App({ rpc }: AppProps) {
 
   const [cloudData, setCloudData] = useState<SynctableSyncResponse | null>(null);
   const [cloudLoading, setCloudLoading] = useState<boolean>(false);
+
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedBrowser, setSelectedBrowser] = useState<string>("all");
 
   const [savedDeviceName, setSavedDeviceName] = useState<string>("");
   const [savedRaindropToken, setSavedRaindropToken] = useState<string>("");
@@ -109,7 +109,6 @@ export function App({ rpc }: AppProps) {
     };
   }, [loadPreferences, loadLocalData, loadCloudData]);
 
-
   // Handle Tab Switch
   const handleTabSwitch = (tab: "local" | "cloud") => {
     setActiveTab(tab);
@@ -166,108 +165,206 @@ export function App({ rpc }: AppProps) {
     (d) => d.tree.reduce((acc, n) => acc + countTabs(n), 0) > 0
   ).length;
 
-  const user = cloudData?.user;
+  // Compute available browsers across local trees or cloud devices
+  const availableBrowsers = useMemo(() => {
+    const browserTimeMap = new Map<string, string>();
+    if (activeTab === "local") {
+      trees.forEach((node) => {
+        if (node.browser_name && countTabs(node) > 0) {
+          const b = node.browser_name.toLowerCase();
+          const time = node.lastUpdateTime || node.snapshot_time || "";
+          const existing = browserTimeMap.get(b) || "";
+          if (time > existing) browserTimeMap.set(b, time);
+        }
+      });
+    } else {
+      (cloudData?.devices || []).forEach((dev) => {
+        dev.tree.forEach((node) => {
+          if (node.browser_name && countTabs(node) > 0) {
+            const b = node.browser_name.toLowerCase();
+            const time = node.lastUpdateTime || node.snapshot_time || "";
+            const existing = browserTimeMap.get(b) || "";
+            if (time > existing) browserTimeMap.set(b, time);
+          }
+        });
+      });
+    }
+    return Array.from(browserTimeMap.keys()).sort((a, b) => {
+      const timeA = browserTimeMap.get(a) || "";
+      const timeB = browserTimeMap.get(b) || "";
+      if (timeA && timeB) return timeB.localeCompare(timeA);
+      if (timeA) return -1;
+      if (timeB) return 1;
+      return a.localeCompare(b);
+    });
+  }, [activeTab, trees, cloudData]);
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-950 font-sans select-none">
+    <div className="h-screen w-screen flex flex-col overflow-hidden bg-surface text-on-surface font-body-lg select-none">
       {/* Top Navigation Bar with macOS Inset Drag Area */}
       <header
         style={{ WebkitAppRegion: "drag", appRegion: "drag" } as React.CSSProperties}
-        className="h-12 border-b border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-4 shrink-0 electrobun-webkit-app-region-drag titlebar-drag-region"
+        className="bg-surface dark:bg-surface-dim border-b border-outline-variant/60 dark:border-outline px-container-padding py-2.5 flex items-center justify-between shrink-0 electrobun-webkit-app-region-drag titlebar-drag-region sticky top-0 z-50 gap-4"
       >
-        {/* Left: Brand with spacing for macOS traffic light buttons */}
-        <div className="flex items-center space-x-2.5 pl-20">
-          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white dark:from-slate-800 dark:via-slate-800/60 dark:to-slate-900 border border-sky-200/60 dark:border-slate-700/60 flex items-center justify-center shadow-xs overflow-hidden select-none">
-            <img src="assets/logo.png" alt="Synctable" className="w-5 h-5 object-contain" />
-          </div>
-          <div className="hidden min-[720px]:flex items-baseline space-x-1.5">
-            <span className="text-xs font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
+        {/* Left: Brand logo + Synctable text, immediately followed by the Segmented Tab Switcher */}
+        <div className="flex items-center gap-3.5 pl-16 shrink-0">
+          <div className="flex items-center gap-2.5 select-none">
+            <div className="w-8 h-8 rounded-xl bg-surface-container-high border border-outline-variant/60 flex items-center justify-center shadow-xs overflow-hidden shrink-0">
+              <img src="assets/logo.png" alt="Synctable" className="w-6 h-6 object-contain" />
+            </div>
+            <span className="font-headline-lg text-[18px] font-bold text-on-surface leading-tight">
               Synctable
             </span>
-            <span className="text-[10px] font-medium text-slate-400 font-mono">
-              v0.1.0
-            </span>
+          </div>
+
+          {/* Segmented Pill Tab Switcher */}
+          <div
+            style={{ WebkitAppRegion: "no-drag", appRegion: "no-drag" } as React.CSSProperties}
+            className="flex items-center p-0.5 rounded-full bg-surface-container border border-outline-variant/60 electrobun-webkit-app-region-no-drag titlebar-no-drag shrink-0"
+          >
+            <button
+              onClick={() => handleTabSwitch("local")}
+              title="Current Device"
+              className={`flex items-center gap-1.5 px-2.5 min-[700px]:px-3.5 py-1 rounded-full font-label-md text-label-md font-semibold transition-all cursor-pointer ${
+                activeTab === "local"
+                  ? "bg-surface text-on-surface shadow-2xs"
+                  : "text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[15px]">laptop_mac</span>
+              <span className="hidden min-[700px]:inline">Current Device</span>
+            </button>
+
+            <button
+              onClick={() => handleTabSwitch("cloud")}
+              title={`All Devices (${validDevicesCount})`}
+              className={`flex items-center gap-1.5 px-2.5 min-[700px]:px-3.5 py-1 rounded-full font-label-md text-label-md font-semibold transition-all cursor-pointer ${
+                activeTab === "cloud"
+                  ? "bg-surface text-on-surface shadow-2xs"
+                  : "text-on-surface-variant hover:text-on-surface"
+              }`}
+            >
+              <span className="material-symbols-outlined text-[15px]">cloud</span>
+              <span className="hidden min-[700px]:inline">All Devices</span>
+              {validDevicesCount > 0 && (
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-primary-container text-on-primary-container">
+                  {validDevicesCount}
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
-        {/* Center: Segmented Tab Switcher */}
+        {/* Center: Search Input (Hidden when < 1080px) */}
         <div
           style={{ WebkitAppRegion: "no-drag", appRegion: "no-drag" } as React.CSSProperties}
-          className="flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 electrobun-webkit-app-region-no-drag titlebar-no-drag"
+          className="hidden min-[1080px]:flex flex-1 max-w-xl mx-4 relative electrobun-webkit-app-region-no-drag titlebar-no-drag"
         >
-          <button
-            onClick={() => handleTabSwitch("local")}
-            className={`flex items-center space-x-1.5 px-3.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+          <span className="material-symbols-outlined absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px] pointer-events-none">
+            search
+          </span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={
               activeTab === "local"
-                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-            }`}
-          >
-            <span>💻</span>
-            <span>Current Device</span>
-          </button>
-
-          <button
-            onClick={() => handleTabSwitch("cloud")}
-            className={`flex items-center space-x-1.5 px-3.5 py-1 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === "cloud"
-                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-xs"
-                : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-            }`}
-          >
-            <span>☁️</span>
-            <span>All Devices</span>
-            {validDevicesCount > 0 && (
-              <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-cyan-100 dark:bg-cyan-950/80 text-cyan-700 dark:text-cyan-300">
-                {validDevicesCount}
-              </span>
-            )}
-          </button>
+                ? "Search tabs, URLs, or workspaces in current device..."
+                : "Search tabs, URLs, or workspaces across all devices..."
+            }
+            className="w-full h-9 pl-10 pr-8 rounded-full bg-surface-container text-on-surface border-none focus:ring-2 focus:ring-primary-container font-body-sm text-body-sm placeholder:text-on-surface-variant transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface p-0.5"
+              title="Clear search"
+            >
+              <span className="material-symbols-outlined text-[16px]">close</span>
+            </button>
+          )}
         </div>
 
-        {/* Right: User Pill & Settings */}
+        {/* Right Actions: Browser Filter, Sync/Refresh, and Settings */}
         <div
           style={{ WebkitAppRegion: "no-drag", appRegion: "no-drag" } as React.CSSProperties}
-          className="flex items-center space-x-2 electrobun-webkit-app-region-no-drag titlebar-no-drag"
+          className="flex items-center gap-2 min-[1080px]:gap-3 shrink-0 electrobun-webkit-app-region-no-drag titlebar-no-drag"
         >
-          {user && (
-            <div className="hidden min-[720px]:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-slate-100/90 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 text-xs text-slate-700 dark:text-slate-300">
-              {user.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt=""
-                  className="w-4 h-4 rounded-full object-cover"
-                />
-              ) : (
-                <span className="w-4 h-4 rounded-full bg-slate-300 dark:bg-slate-700 text-[10px] font-bold flex items-center justify-center">
-                  {(user.name || "U").charAt(0).toUpperCase()}
-                </span>
-              )}
-              <span className="font-semibold truncate max-w-[100px]">
-                {user.name}
+          {/* Browser Filter Dropdown (Icon-only when < 1080px, expanded pill when >= 1080px) */}
+          <label
+            className="relative shrink-0 flex items-center justify-center w-9 h-9 min-[1080px]:w-auto min-[1080px]:h-9 rounded-full border border-outline-variant bg-surface hover:bg-surface-container-low transition-colors cursor-pointer"
+            title="Filter by Browser"
+          >
+            <span className="material-symbols-outlined text-[18px] min-[1080px]:text-[16px] text-on-surface-variant min-[1080px]:absolute min-[1080px]:left-3 min-[1080px]:top-1/2 min-[1080px]:-translate-y-1/2 pointer-events-none select-none">
+              language
+            </span>
+
+            <select
+              value={selectedBrowser}
+              onChange={(e) => setSelectedBrowser(e.target.value)}
+              className="opacity-0 min-[1080px]:opacity-100 absolute inset-0 w-full h-full min-[1080px]:static min-[1080px]:w-auto min-[1080px]:min-w-[140px] min-[1080px]:max-w-[150px] min-[1080px]:h-full min-[1080px]:pl-9 min-[1080px]:pr-8 min-[1080px]:bg-transparent font-label-md text-label-md text-on-surface appearance-none cursor-pointer truncate select-none"
+            >
+              <option value="all">All Browsers</option>
+              {availableBrowsers.map((b) => (
+                <option key={b} value={b}>
+                  {b.toUpperCase()} Browser
+                </option>
+              ))}
+            </select>
+
+            <span className="hidden min-[1080px]:inline-block pointer-events-none">
+              <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[16px] select-none">
+                expand_more
               </span>
-              {user.isPro && (
-                <span className="text-[9px] font-extrabold uppercase px-1 py-0.2 rounded bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-300/60 dark:border-amber-700/60">
-                  PRO
-                </span>
-              )}
-            </div>
+            </span>
+          </label>
+
+          {/* Sync / Refresh Button (Icon-only when < 1080px, expanded pill when >= 1080px) */}
+          {activeTab === "local" ? (
+            <button
+              onClick={handleSyncNow}
+              disabled={localSyncing}
+              className="flex items-center justify-center gap-1.5 w-9 h-9 min-[1080px]:w-auto min-[1080px]:px-4 min-[1080px]:h-9 rounded-full bg-primary text-on-primary hover:bg-surface-tint disabled:opacity-50 font-label-md text-label-md transition-colors shadow-2xs shrink-0 cursor-pointer"
+              title={localSyncing ? "Syncing..." : "Sync Now (Poll and Parse Local Browser Trees)"}
+            >
+              <span className={`material-symbols-outlined text-[18px] min-[1080px]:text-[16px] ${localSyncing ? "animate-spin" : ""}`}>
+                sync
+              </span>
+              <span className="hidden min-[1080px]:inline">
+                {localSyncing ? "Syncing..." : "Sync Now"}
+              </span>
+            </button>
+          ) : (
+            <button
+              onClick={() => loadCloudData(false, true)}
+              disabled={cloudLoading}
+              className="flex items-center justify-center gap-1.5 w-9 h-9 min-[1080px]:w-auto min-[1080px]:px-4 min-[1080px]:h-9 rounded-full bg-primary text-on-primary hover:bg-surface-tint disabled:opacity-50 font-label-md text-label-md transition-colors shadow-2xs shrink-0 cursor-pointer"
+              title={cloudLoading ? "Refreshing..." : "Refresh Snapshots from Cloud"}
+            >
+              <span className={`material-symbols-outlined text-[18px] min-[1080px]:text-[16px] ${cloudLoading ? "animate-spin" : ""}`}>
+                refresh
+              </span>
+              <span className="hidden min-[1080px]:inline">
+                {cloudLoading ? "Refreshing..." : "Refresh"}
+              </span>
+            </button>
           )}
 
+          {/* Settings Button */}
           <button
             onClick={() => setIsSettingsOpen(true)}
-            className="w-7 h-7 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
-            title="Settings"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low transition-colors duration-200 cursor-pointer shrink-0"
+            title="Preferences"
           >
-            <Settings className="w-4 h-4" />
+            <span className="material-symbols-outlined text-[20px]">settings</span>
           </button>
         </div>
       </header>
 
-      {/* Main Content View */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {activeTab === "local" ? (
-          <div className="flex-1 p-5 overflow-y-auto zen-scrollbar">
+      {/* Main Content View Canvas */}
+      <main className="flex-1 w-full overflow-y-auto zen-scrollbar">
+        <div className="w-full max-w-max-width mx-auto px-container-padding py-6 flex flex-col gap-10">
+          {activeTab === "local" ? (
             <LocalTab
               stats={stats}
               trees={trees}
@@ -275,10 +372,10 @@ export function App({ rpc }: AppProps) {
               onSync={handleSyncNow}
               onOpenExternal={handleOpenExternal}
               deviceName={savedDeviceName}
+              searchQuery={searchQuery}
+              selectedBrowser={selectedBrowser}
             />
-          </div>
-        ) : (
-          <div className="flex-1 p-5 overflow-y-auto zen-scrollbar">
+          ) : (
             <MultiDeviceCardsPortal
               data={cloudData}
               loading={cloudLoading}
@@ -286,10 +383,13 @@ export function App({ rpc }: AppProps) {
               onOpenExternal={handleOpenExternal}
               onSaveToken={handleSaveToken}
               onSwitchToLocal={() => setActiveTab("local")}
+              hideToolbar={true}
+              searchQuery={searchQuery}
+              selectedBrowser={selectedBrowser}
             />
-          </div>
-        )}
-      </div>
+          )}
+        </div>
+      </main>
 
       {/* Settings Modal */}
       <SettingsModal

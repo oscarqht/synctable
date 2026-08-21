@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { ExternalLink, Copy, Check } from "lucide-react";
 import type { BrowserTreeNode } from "../../types";
 import {
   isValidHttpUrl,
@@ -73,12 +72,12 @@ export function ZenSplitViewItem({
     return (
       <div
         title={`Split View: ${children.map((c) => c.title || getDomain(c.url)).join(" | ")}`}
-        className={`w-10 h-10 rounded-2xl flex items-center justify-center relative cursor-pointer group/tab transition-all duration-150 active:scale-95 ${
+        className={`w-10 h-10 rounded-lg flex items-center justify-center relative cursor-pointer group/tab transition-all duration-150 active:scale-95 ${
           isAnyTabActive
-            ? "bg-white dark:bg-slate-800 shadow-sm ring-2 ring-cyan-500/50"
+            ? "bg-white dark:bg-surface-container-highest shadow-xs ring-2 ring-primary/50"
             : isDarkTheme
             ? "hover:bg-white/20 text-white"
-            : "hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300"
+            : "hover:bg-surface-container-low text-on-surface"
         }`}
       >
         <div className="grid grid-cols-2 gap-0.5 w-6 h-6 p-0.5 items-center justify-center">
@@ -87,12 +86,12 @@ export function ZenSplitViewItem({
             return (
               <div
                 key={tab.id || idx}
-                className="w-full h-full rounded bg-slate-200/80 dark:bg-slate-700/80 flex items-center justify-center overflow-hidden"
+                className="w-full h-full rounded bg-surface-container-high flex items-center justify-center overflow-hidden"
               >
                 {fav ? (
                   <img src={fav} alt="" className="w-2.5 h-2.5 object-contain" />
                 ) : (
-                  <span className="text-[8px] font-bold text-slate-500">
+                  <span className="text-[8px] font-bold text-on-surface-variant">
                     {idx + 1}
                   </span>
                 )}
@@ -111,13 +110,15 @@ export function ZenSplitViewItem({
           onSelectTab?.(children[0]);
         }
       }}
-      className={`group/tab relative flex items-center gap-2 px-3.5 py-2.5 min-h-[42px] rounded-2xl cursor-pointer transition-all duration-150 select-none ${
+      className={`group/tab relative flex items-center gap-2 px-3 h-9 rounded-lg cursor-pointer transition-colors duration-200 select-none ${
         isAnyTabActive
-          ? "bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white shadow-xs border border-white/60 dark:border-white/10 font-bold backdrop-blur-xs"
+          ? isDarkTheme
+            ? "bg-white/25 text-white font-bold"
+            : "bg-surface-container-high text-on-surface font-bold shadow-2xs"
           : isDarkTheme
-          ? "hover:bg-white/20 text-white font-medium"
-          : "hover:bg-white/40 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 font-semibold"
-      } active:scale-[0.99]`}
+          ? "hover:bg-white/20 text-inherit"
+          : "hover:bg-surface-container-low text-on-surface"
+      }`}
     >
       {/* Side-by-side split panes separated by clean divider lines */}
       <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
@@ -129,7 +130,7 @@ export function ZenSplitViewItem({
           return (
             <React.Fragment key={tab.id || `${tab.title}_${idx}`}>
               {idx > 0 && (
-                <div className="w-px h-3.5 shrink-0 bg-black/20" />
+                <div className="w-px h-3.5 shrink-0 bg-outline-variant/50" />
               )}
               <div
                 onClick={(e) => {
@@ -137,10 +138,10 @@ export function ZenSplitViewItem({
                   onSelectTab?.(tab);
                 }}
                 title={`${tab.title || domain || "Tab"}\n${tab.url || ""}`}
-                className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer overflow-hidden py-0.5 rounded-lg hover:opacity-80 transition-opacity"
+                className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer overflow-hidden py-0.5 rounded hover:opacity-80 transition-opacity"
               >
                 {/* Favicon */}
-                <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 overflow-hidden">
+                <div className="w-4 h-4 flex items-center justify-center shrink-0 overflow-hidden">
                   {favicon ? (
                     <img
                       src={favicon}
@@ -148,19 +149,15 @@ export function ZenSplitViewItem({
                       className="w-4 h-4 object-contain rounded shrink-0"
                     />
                   ) : (
-                    <span className="w-4 h-4 rounded bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center uppercase">
-                      {domain ? domain.charAt(0) : `${idx + 1}`}
-                    </span>
+                    <span className="material-symbols-outlined text-[14px] leading-none">public</span>
                   )}
                 </div>
 
                 {/* Tab Title */}
                 <span
-                  className={`text-sm truncate leading-tight tracking-tight ${
-                    isDarkTheme && !isAnyTabActive
-                      ? "text-white font-medium"
-                      : ""
-                  } ${isTabActive ? "underline decoration-cyan-500 underline-offset-2" : ""}`}
+                  className={`font-body-sm text-body-sm truncate ${
+                    isTabActive ? "underline decoration-primary underline-offset-2 font-bold" : ""
+                  }`}
                 >
                   {tab.title || domain || `Pane ${idx + 1}`}
                 </span>
@@ -174,45 +171,49 @@ export function ZenSplitViewItem({
       <div
         className={`${
           isSingleColumn || alwaysShowActions
-            ? "flex"
-            : "flex md:hidden md:group-hover/tab:flex"
-        } items-center gap-1 shrink-0 -my-1`}
+            ? "opacity-100"
+            : "opacity-0 md:group-hover/tab:opacity-100 group-focus-within/tab:opacity-100"
+        } flex items-center gap-1 shrink-0 transition-opacity duration-150`}
       >
-        <button
+        <span
           onClick={handleCopySplitView}
           title={
             children.length > 1
               ? `Copy all ${children.length} URLs in split view`
               : "Copy URL"
           }
-          className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+          role="button"
+          tabIndex={0}
+          className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
             isDarkTheme
               ? "text-white/70 hover:text-white hover:bg-white/20"
-              : "text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+              : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
           }`}
         >
           {splitCopied ? (
-            <Check className="w-3.5 h-3.5 text-emerald-600" />
+            <span className="material-symbols-outlined text-[15px] text-primary leading-none">check</span>
           ) : (
-            <Copy className="w-3.5 h-3.5" />
+            <span className="material-symbols-outlined text-[15px] leading-none">content_copy</span>
           )}
-        </button>
+        </span>
 
-        <button
+        <span
           onClick={handleOpenSplitView}
           title={
             children.length > 1
               ? `Open all ${children.length} tabs in browser`
               : "Open URL in browser"
           }
-          className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+          role="button"
+          tabIndex={0}
+          className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
             isDarkTheme
               ? "text-white/70 hover:text-white hover:bg-white/20"
-              : "text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+              : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
           }`}
         >
-          <ExternalLink className="w-3.5 h-3.5" />
-        </button>
+          <span className="material-symbols-outlined text-[15px] leading-none">open_in_new</span>
+        </span>
       </div>
     </div>
   );

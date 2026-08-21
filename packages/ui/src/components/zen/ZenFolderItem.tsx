@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState } from "react";
-import { Copy, Check, ExternalLink } from "lucide-react";
 import type { BrowserTreeNode } from "../../types";
 import { countTabs, getAllTabUrls } from "../../utils/treeUtils";
 import { ZenFolderIcon } from "./ZenFolderIcon";
@@ -82,40 +81,38 @@ export function ZenFolderItem({
       <div
         onClick={() => setIsOpen(!isOpen)}
         title={`Folder: ${folder.title || "Folder"} (${children.length} tabs)`}
-        className={`w-10 h-10 rounded-2xl flex items-center justify-center cursor-pointer relative transition-all ${
-          isDarkTheme ? "hover:bg-white/20 text-white" : "hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
+        className={`w-10 h-10 rounded-lg flex items-center justify-center cursor-pointer relative transition-all ${
+          isDarkTheme ? "hover:bg-white/20 text-white" : "hover:bg-surface-container-low text-on-surface"
         }`}
       >
-        <ZenFolderIcon isOpen={isOpen} size={22} color={folderColor} />
+        <ZenFolderIcon isOpen={isOpen} size={20} color={folderColor} />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col select-none my-0.5 group/folder">
+    <div className="flex flex-col select-none my-1 group/folder">
       {/* Folder Row */}
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-3 px-3.5 py-2.5 rounded-2xl cursor-pointer transition-all duration-150 active:scale-[0.99] ${
+        className={`flex items-center gap-2 px-3 h-8 rounded-lg cursor-pointer transition-colors duration-200 ${
           isDarkTheme
-            ? "hover:bg-white/15 text-white"
-            : "hover:bg-white/40 dark:hover:bg-white/10"
+            ? "hover:bg-white/15 text-inherit opacity-85 hover:opacity-100"
+            : "hover:bg-surface-container-low text-on-surface-variant hover:text-on-surface"
         }`}
       >
-        {/* Color Outline Folder Icon or Emoji */}
+        {/* Folder Icon or Emoji */}
         {folder.icon ? (
-          <span className="text-base shrink-0 leading-none">{folder.icon}</span>
+          <span className="text-sm shrink-0 leading-none">{folder.icon}</span>
         ) : (
-          <ZenFolderIcon isOpen={isOpen} size={22} color={folderColor} />
+          <span className="material-symbols-outlined text-[16px] shrink-0 leading-none">
+            {isOpen ? "folder_open" : "folder"}
+          </span>
         )}
 
         {/* Folder Title */}
-        <span
-          className={`text-sm font-bold truncate flex-1 leading-tight tracking-tight flex items-center gap-2 ${
-            isDarkTheme ? "text-white" : "text-slate-900 dark:text-slate-100"
-          }`}
-        >
-          <span>{folder.title || "Folder"}</span>
+        <span className="font-label-md text-label-md truncate flex-1 min-w-0 font-semibold flex items-center gap-2">
+          <span className="truncate">{folder.title || "Folder"}</span>
           {folderColor && (
             <span
               className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
@@ -129,42 +126,46 @@ export function ZenFolderItem({
         <div
           className={`${
             isSingleColumn || alwaysShowActions
-              ? "flex"
-              : "flex md:hidden md:group-hover/folder:flex"
-          } items-center gap-1 shrink-0 -my-1`}
+              ? "opacity-100"
+              : "opacity-0 md:group-hover/folder:opacity-100 group-focus-within/folder:opacity-100"
+          } flex items-center gap-1 shrink-0 transition-opacity duration-150`}
         >
-          <button
+          <span
             onClick={handleCopyFolder}
-            title={`Copy all ${countTabs(folder)} tab URLs in folder`}
-            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+            title={`Copy all ${countTabs(folder)} tab URLs`}
+            role="button"
+            tabIndex={0}
+            className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
               isDarkTheme
                 ? "text-white/70 hover:text-white hover:bg-white/20"
-                : "text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
             }`}
           >
             {copied ? (
-              <Check className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="material-symbols-outlined text-[15px] text-primary leading-none">check</span>
             ) : (
-              <Copy className="w-3.5 h-3.5" />
+              <span className="material-symbols-outlined text-[15px] leading-none">content_copy</span>
             )}
-          </button>
-          <button
+          </span>
+          <span
             onClick={handleOpenFolder}
-            title={`Open all ${countTabs(folder)} tabs in folder`}
-            className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+            title={`Open all ${countTabs(folder)} tabs`}
+            role="button"
+            tabIndex={0}
+            className={`w-6 h-6 flex items-center justify-center rounded transition-colors ${
               isDarkTheme
                 ? "text-white/70 hover:text-white hover:bg-white/20"
-                : "text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
             }`}
           >
-            <ExternalLink className="w-3.5 h-3.5" />
-          </button>
+            <span className="material-symbols-outlined text-[15px] leading-none">open_in_new</span>
+          </span>
         </div>
       </div>
 
-      {/* Nested Children Indented */}
+      {/* Nested Children */}
       {isOpen && children.length > 0 && (
-        <div className="flex flex-col space-y-0.5 pl-6 my-0.5 transition-all">
+        <div className="flex flex-col space-y-1 pl-3 my-0.5 transition-all">
           {children.map((child, idx) => {
             if (child.node_type === "folder") {
               return (
