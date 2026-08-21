@@ -81,21 +81,16 @@ export function ZenSidebarView({
     return allItems.filter(matchRecursive);
   }, [allItems, activeSearch]);
 
-  // Categorize filtered items into pinned tabs and regular items
-  const { pinnedTabs, regularItems } = useMemo(() => {
-    const pinned: BrowserTreeNode[] = [];
-    const regular: BrowserTreeNode[] = [];
-
-    for (const item of filteredItems) {
-      if (item.node_type === "pinned_tab") {
-        pinned.push(item);
-      } else {
-        regular.push(item);
-      }
+function isPinnedNode(item: BrowserTreeNode): boolean {
+  if (item.node_type === "pinned_tab") return true;
+  if (item.node_type === "split_view" || item.node_type === "folder") {
+    if (item.children && item.children.length > 0) {
+      return item.children.every(isPinnedNode);
     }
+  }
+  return false;
+}
 
-    return { pinnedTabs: pinned, regularItems: regular };
-  }, [filteredItems]);
 
   const isDark = Boolean(
     (currentWorkspaceItem?.themeColors &&
@@ -273,26 +268,28 @@ export function ZenSidebarView({
             No tabs in this workspace
           </div>
         ) : (
-          <>
-            {/* Pinned tabs */}
-            {pinnedTabs.map((item, idx) => renderItem(item, idx))}
+          filteredItems.map((item, idx) => {
+            const isCurrentPinned = isPinnedNode(item);
+            const nextItem = filteredItems[idx + 1];
+            const isNextUnpinned = nextItem ? !isPinnedNode(nextItem) : false;
+            const showDivider = isCurrentPinned && isNextUnpinned;
 
-            {/* Separator below pinned tabs */}
-            {pinnedTabs.length > 0 && regularItems.length > 0 && (
-              <div
-                className={`my-2 border-b mx-1.5 ${
-                  isDark
-                    ? "border-white/20"
-                    : "border-slate-200/80 dark:border-slate-800/80"
-                }`}
-              />
-            )}
+            return (
+              <React.Fragment key={item.id || `item_${idx}`}>
+                {renderItem(item, idx)}
+                {showDivider && (
+                  <div
+                    className={`my-2 border-b mx-1.5 ${
+                      isDark
+                        ? "border-white/20"
+                        : "border-slate-200/80 dark:border-slate-800/80"
+                    }`}
+                  />
+                )}
+              </React.Fragment>
+            );
+          })
 
-            {/* Regular items */}
-            {regularItems.map((item, idx) =>
-              renderItem(item, idx + pinnedTabs.length)
-            )}
-          </>
         )}
       </div>
     </div>

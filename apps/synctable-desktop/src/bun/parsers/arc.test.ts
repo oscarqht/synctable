@@ -39,6 +39,57 @@ test("imports Arc's alternating sidebar records, folders, split views, and pinne
   expect(nodes.filter((node) => node.parent_id === "arc-space-space-work").map((node) => node.title)).toEqual(["Pinned", "Reading", "Split View"]);
 });
 
+test("preserves visual ordering when a split view is placed between pinned tabs in an Arc space", () => {
+  const directory = mkdtempSync(join(tmpdir(), "synctable-arc-order-"));
+  const filePath = join(directory, "StorableSidebar.json");
+  writeFileSync(filePath, JSON.stringify({
+    sidebar: {
+      containers: [{
+        spaces: [
+          "space-lab",
+          {
+            id: "space-lab",
+            title: "Lab",
+            newContainerIDs: [{ pinned: {} }, "pinned-container", { unpinned: {} }, "unpinned-container"],
+          },
+        ],
+        items: [
+          "pinned-container", { id: "pinned-container", data: { itemContainer: {} }, childrenIds: ["tab-todo", "split-api-design", "tab-dev"] },
+          "unpinned-container", { id: "unpinned-container", data: { itemContainer: {} }, childrenIds: [] },
+          "tab-todo", { id: "tab-todo", data: { tab: { savedURL: "https://todo.example", savedTitle: "todo" } } },
+          "split-api-design", { id: "split-api-design", data: { splitView: {} }, childrenIds: ["tab-api", "tab-design"] },
+          "tab-api", { id: "tab-api", data: { tab: { savedURL: "https://api.example", savedTitle: "api" } } },
+          "tab-design", { id: "tab-design", data: { tab: { savedURL: "https://design.example", savedTitle: "design" } } },
+          "tab-dev", { id: "tab-dev", data: { tab: { savedURL: "https://localhost:3002", savedTitle: "dev" } } },
+        ],
+      }],
+    },
+  }));
+
+  const nodes = parseArcSidebar({ filePath, osType: "macos", profileName: "Default", snapshotTime: "now" });
+  const labSpace = nodes.find((n) => n.node_type === "workspace" && n.title === "Lab");
+  expect(labSpace).toBeDefined();
+
+  const workspaceChildren = nodes
+    .filter((n) => n.parent_id === labSpace?.id)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  expect(workspaceChildren.map((n) => ({ title: n.title, type: n.node_type }))).toEqual([
+    { title: "todo", type: "pinned_tab" },
+    { title: "Split View", type: "split_view" },
+    { title: "dev", type: "pinned_tab" },
+  ]);
+
+  const splitChildren = nodes
+    .filter((n) => n.parent_id === workspaceChildren[1].id)
+    .sort((a, b) => a.sort_order - b.sort_order);
+
+  expect(splitChildren.map((n) => ({ title: n.title, type: n.node_type }))).toEqual([
+    { title: "api", type: "pinned_tab" },
+    { title: "design", type: "pinned_tab" },
+  ]);
+});
+
 test("extracts Arc space theme colors and emoji icons for single colors and blended gradients", () => {
   const directory = mkdtempSync(join(tmpdir(), "synctable-arc-theme-"));
   const filePath = join(directory, "StorableSidebar.json");
