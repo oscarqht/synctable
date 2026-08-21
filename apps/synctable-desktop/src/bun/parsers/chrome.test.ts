@@ -115,4 +115,55 @@ describe("parseChromePreferences", () => {
     expect(nodes.some((node) => node.node_type === "split_view")).toBe(false);
     expect(nodes.find((node) => node.url === "https://example.com")?.parent_id).toContain("ws-default");
   });
+
+  test("extracts tab group colors from session metadata and preferences", () => {
+    const dir = mkdtempSync(join(tmpdir(), "synctable-chrome-"));
+    tempDirs.push(dir);
+    const preferences = join(dir, "Preferences");
+    const session = join(dir, "Session_test");
+
+    const groupToken1 = Buffer.alloc(16);
+    groupToken1.writeBigUInt64LE(101n, 0);
+    groupToken1.writeBigUInt64LE(102n, 8);
+
+    const groupToken2 = Buffer.alloc(16);
+    groupToken2.writeBigUInt64LE(201n, 0);
+    groupToken2.writeBigUInt64LE(202n, 8);
+
+    // Group 1 metadata in Session command 27 with title "BlueGroup" and color 1 (Blue)
+    const title1 = "BlueGroup";
+    const byteLen1 = title1.length * 2;
+    const offsetAfterTitle1 = (24 + byteLen1 + 3) & ~3;
+    const metadata = Buffer.alloc(offsetAfterTitle1 + 4);
+    groupToken1.copy(metadata, 4);
+    metadata.writeInt32LE(title1.length, 20);
+    metadata.write(title1, 24, "utf16le");
+    metadata.writeUInt32LE(1, offsetAfterTitle1); // 1 = Blue (#1a73e8)
+
+    // Group 2 in Preferences with color 2 (Red -> #d93025)
+    const group2Id = `${201n.toString(16)}-${202n.toString(16)}`;
+    writeFileSync(preferences, JSON.stringify({
+      tab_groups: {
+        [group2Id]: {
+          title: "RedGroup",
+          color: 2,
+        },
+      },
+    }));
+
+    writeFileSync(session, Buffer.concat([
+      Buffer.from([0x53, 0x4e, 0x53, 0x53, 3, 0, 0, 0]),
+      command(0, Buffer.from([10, 0, 0, 0, 51, 0, 0, 0])), command(2, Buffer.from([51, 0, 0, 0, 0, 0, 0, 0])), navigation(51, "https://blue.example"), groupTab(51, groupToken1), command(27, metadata),
+      command(0, Buffer.from([10, 0, 0, 0, 52, 0, 0, 0])), command(2, Buffer.from([52, 0, 0, 0, 1, 0, 0, 0])), navigation(52, "https://red.example"), groupTab(52, groupToken2),
+    ]));
+
+    const nodes = parseChromePreferences({ filePath: preferences, sessionFilePath: session, osType: "macos", profileName: "Default", snapshotTime: "now" });
+    const blueFolder = nodes.find((node) => node.node_type === "folder" && node.title === "BlueGroup");
+    const redFolder = nodes.find((node) => node.node_type === "folder" && node.title === "RedGroup");
+
+    expect(blueFolder?.theme_color).toBe("#1a73e8");
+    expect(blueFolder?.theme_colors).toEqual(["#1a73e8"]);
+    expect(redFolder?.theme_color).toBe("#d93025");
+    expect(redFolder?.theme_colors).toEqual(["#d93025"]);
+  });
 });

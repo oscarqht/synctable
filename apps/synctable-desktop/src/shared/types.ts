@@ -127,7 +127,7 @@ export interface SynctableRPCSchema extends ElectrobunRPCSchema {
         response: void;
       };
       getCloudData: {
-        params: void;
+        params: { forceRefresh?: boolean } | undefined;
         response: CloudSyncResponse;
       };
       openExternalURL: {

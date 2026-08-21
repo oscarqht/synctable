@@ -128,6 +128,7 @@ function isPinnedNode(item: BrowserTreeNode): boolean {
         <ZenSplitViewItem
           key={item.id || `split_${idx}`}
           node={item}
+          activeTabId={activeTabId}
           isDarkTheme={isDark}
           isSingleColumn={isSingleColumn}
           alwaysShowActions={alwaysShowActions}
@@ -278,13 +279,7 @@ function isPinnedNode(item: BrowserTreeNode): boolean {
               <React.Fragment key={item.id || `item_${idx}`}>
                 {renderItem(item, idx)}
                 {showDivider && (
-                  <div
-                    className={`my-2 border-b mx-1.5 ${
-                      isDark
-                        ? "border-white/20"
-                        : "border-slate-200/80 dark:border-slate-800/80"
-                    }`}
-                  />
+                  <div className="my-2 border-b border-black/20 mx-1.5" />
                 )}
               </React.Fragment>
             );

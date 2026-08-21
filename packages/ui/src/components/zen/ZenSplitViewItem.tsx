@@ -1,13 +1,20 @@
 "use client";
 
 import React, { useState } from "react";
-import { Columns, ExternalLink, Copy, Check } from "lucide-react";
+import { ExternalLink, Copy, Check } from "lucide-react";
 import type { BrowserTreeNode } from "../../types";
-import { isValidHttpUrl, countTabs, getAllTabUrls, getDomain, getFaviconUrl } from "../../utils/treeUtils";
+import {
+  isValidHttpUrl,
+  countTabs,
+  getAllTabUrls,
+  getDomain,
+  getFaviconUrl,
+} from "../../utils/treeUtils";
 
 export interface ZenSplitViewItemProps {
   node: BrowserTreeNode;
   isCompact?: boolean;
+  activeTabId?: string | null;
   isDarkTheme?: boolean;
   isSingleColumn?: boolean;
   alwaysShowActions?: boolean;
@@ -18,19 +25,23 @@ export interface ZenSplitViewItemProps {
 export function ZenSplitViewItem({
   node,
   isCompact = false,
+  activeTabId,
   isDarkTheme = false,
   isSingleColumn = false,
   alwaysShowActions = false,
   onSelectTab,
   onOpenExternal,
 }: ZenSplitViewItemProps) {
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [splitCopied, setSplitCopied] = useState<boolean>(false);
   const children = (node.children || []).filter((c) => isValidHttpUrl(c.url));
 
   if (countTabs(node) === 0 || children.length === 0) {
     return null;
   }
+
+  const isAnyTabActive =
+    (activeTabId && (node.id === activeTabId || children.some((c) => c.id === activeTabId))) ||
+    false;
 
   const handleCopySplitView = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -58,36 +69,19 @@ export function ZenSplitViewItem({
     }
   };
 
-  const handleCopyUrl = (e: React.MouseEvent, tab: BrowserTreeNode) => {
-    e.stopPropagation();
-    if (tab.url) {
-      navigator.clipboard.writeText(tab.url);
-      setCopiedId(tab.id || tab.url);
-      setTimeout(() => setCopiedId(null), 1600);
-    }
-  };
-
-  const handleOpenLink = (e: React.MouseEvent, tab: BrowserTreeNode) => {
-    e.stopPropagation();
-    if (tab.url) {
-      if (onOpenExternal) {
-        e.preventDefault();
-        onOpenExternal(tab.url);
-      }
-    }
-  };
-
   if (isCompact) {
     return (
       <div
         title={`Split View: ${children.map((c) => c.title || getDomain(c.url)).join(" | ")}`}
-        className={`w-9 h-9 rounded-xl border flex items-center justify-center p-1 relative cursor-pointer transition-all shadow-xs ${
-          isDarkTheme
-            ? "border-white/30 bg-white/10 hover:bg-white/20"
-            : "border-cyan-400/40 bg-cyan-500/10 hover:bg-cyan-500/20"
+        className={`w-10 h-10 rounded-2xl flex items-center justify-center relative cursor-pointer group/tab transition-all duration-150 active:scale-95 ${
+          isAnyTabActive
+            ? "bg-white dark:bg-slate-800 shadow-sm ring-2 ring-cyan-500/50"
+            : isDarkTheme
+            ? "hover:bg-white/20 text-white"
+            : "hover:bg-slate-200/60 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300"
         }`}
       >
-        <div className="grid grid-cols-2 gap-0.5 w-full h-full p-0.5 items-center justify-center">
+        <div className="grid grid-cols-2 gap-0.5 w-6 h-6 p-0.5 items-center justify-center">
           {children.slice(0, 2).map((tab, idx) => {
             const fav = getFaviconUrl(tab.url);
             return (
@@ -112,136 +106,113 @@ export function ZenSplitViewItem({
 
   return (
     <div
-      className={`my-1 p-1 rounded-xl border transition-all select-none ${
-        isDarkTheme
-          ? "border-white/20 bg-white/10 hover:border-white/30 hover:bg-white/15"
-          : "border-black/[0.08] dark:border-white/15 bg-white/40 dark:bg-white/10 hover:border-black/15 hover:bg-white/55"
-      }`}
+      onClick={() => {
+        if (children.length > 0) {
+          onSelectTab?.(children[0]);
+        }
+      }}
+      className={`group/tab relative flex items-center gap-2 px-3.5 py-2.5 min-h-[42px] rounded-2xl cursor-pointer transition-all duration-150 select-none ${
+        isAnyTabActive
+          ? "bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white shadow-xs border border-white/60 dark:border-white/10 font-bold backdrop-blur-xs"
+          : isDarkTheme
+          ? "hover:bg-white/20 text-white font-medium"
+          : "hover:bg-white/40 dark:hover:bg-white/10 text-slate-800 dark:text-slate-200 font-semibold"
+      } active:scale-[0.99]`}
     >
-      {/* Split View Header */}
-      <div
-        className={`flex items-center justify-between px-2 py-0.5 mb-1 text-[10px] font-semibold tracking-wide uppercase ${
-          isDarkTheme ? "text-white" : "text-slate-700 dark:text-slate-200"
-        }`}
-      >
-        <div className="flex items-center gap-1.5 min-w-0">
-          <Columns className={`w-3 h-3 shrink-0 ${isDarkTheme ? "text-white" : "text-slate-600 dark:text-slate-300"}`} />
-          <span className="truncate">{node.title || "Split View"}</span>
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={handleCopySplitView}
-            title="Copy all URLs in split view"
-            className={`w-4 h-4 flex items-center justify-center rounded transition-all ${
-              isDarkTheme
-                ? "text-white/70 hover:text-white hover:bg-white/20"
-                : "text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-black/5 dark:hover:bg-white/15"
-            }`}
-          >
-            {splitCopied ? (
-              <Check className="w-2.5 h-2.5 text-emerald-500" />
-            ) : (
-              <Copy className="w-2.5 h-2.5" />
-            )}
-          </button>
-          <button
-            onClick={handleOpenSplitView}
-            title="Open all tabs in split view"
-            className={`w-4 h-4 flex items-center justify-center rounded transition-all ${
-              isDarkTheme
-                ? "text-white/70 hover:text-white hover:bg-white/20"
-                : "text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-black/5 dark:hover:bg-white/15"
-            }`}
-          >
-            <ExternalLink className="w-2.5 h-2.5" />
-          </button>
-          <span
-            className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
-              isDarkTheme ? "bg-white/20 text-white" : "bg-black/5 dark:bg-white/15 text-slate-700 dark:text-slate-200"
-            }`}
-          >
-            {children.length} panes
-          </span>
-        </div>
-      </div>
+      {/* Side-by-side split panes separated by clean divider lines */}
+      <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
+        {children.map((tab, idx) => {
+          const domain = getDomain(tab.url);
+          const favicon = getFaviconUrl(tab.url);
+          const isTabActive = activeTabId === tab.id;
 
-      {/* Side-by-Side Panes (Zen Segmented Card) */}
-      <div className="flex items-stretch rounded-lg bg-white/70 dark:bg-slate-900/70 backdrop-blur-xs border border-white/50 dark:border-white/10 shadow-2xs overflow-hidden divide-x divide-slate-200/80 dark:divide-slate-800">
-        {children.length === 0 ? (
-          <div className="p-2 text-xs text-slate-400 text-center w-full">
-            Empty Split View
-          </div>
-        ) : (
-          children.map((tab, idx) => {
-            const domain = getDomain(tab.url);
-            const favicon = getFaviconUrl(tab.url);
-            const isCopied = copiedId === (tab.id || tab.url);
-
-            return (
+          return (
+            <React.Fragment key={tab.id || `${tab.title}_${idx}`}>
+              {idx > 0 && (
+                <div className="w-px h-3.5 shrink-0 bg-black/20" />
+              )}
               <div
-                key={tab.id || `${tab.title}_${idx}`}
-                onClick={() => onSelectTab?.(tab)}
-                className="flex-1 min-w-0 p-2 flex flex-col justify-between hover:bg-slate-100/70 dark:hover:bg-slate-800/70 cursor-pointer transition-all group/pane relative"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectTab?.(tab);
+                }}
+                title={`${tab.title || domain || "Tab"}\n${tab.url || ""}`}
+                className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer overflow-hidden py-0.5 rounded-lg hover:opacity-80 transition-opacity"
               >
-                <div className="flex items-center gap-1.5 mb-1">
-                  <div className="w-4 h-4 rounded flex items-center justify-center shrink-0 bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
-                    {favicon ? (
-                      <img src={favicon} alt="" className="w-3 h-3 object-contain" />
-                    ) : (
-                      <span className="text-[9px] font-bold text-slate-500">
-                        {idx + 1}
-                      </span>
-                    )}
-                  </div>
-                  <span
-                    className="text-[11px] font-medium text-slate-800 dark:text-slate-200 truncate leading-tight flex-1"
-                    title={tab.title || domain || "Tab"}
-                  >
-                    {tab.title || domain || `Pane ${idx + 1}`}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between mt-0.5 h-4">
-                  <span className="text-[9px] text-slate-400 dark:text-slate-500 truncate max-w-[80px]">
-                    {domain || "about:blank"}
-                  </span>
-
-                  {tab.url && (
-                    <div
-                      className={`${
-                        isSingleColumn || alwaysShowActions
-                          ? "flex"
-                          : "flex md:hidden md:group-hover/pane:flex"
-                      } items-center gap-0.5 shrink-0`}
-                    >
-                      <button
-                        onClick={(e) => handleCopyUrl(e, tab)}
-                        title="Copy URL"
-                        className="w-4 h-4 flex items-center justify-center rounded text-slate-400 hover:text-cyan-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
-                      >
-                        {isCopied ? (
-                          <Check className="w-2.5 h-2.5 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-2.5 h-2.5" />
-                        )}
-                      </button>
-                      <a
-                        href={tab.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => handleOpenLink(e, tab)}
-                        title="Open pane URL"
-                        className="w-4 h-4 flex items-center justify-center rounded text-slate-400 hover:text-indigo-600 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all"
-                      >
-                        <ExternalLink className="w-2.5 h-2.5" />
-                      </a>
-                    </div>
+                {/* Favicon */}
+                <div className="w-5 h-5 rounded-md flex items-center justify-center shrink-0 overflow-hidden">
+                  {favicon ? (
+                    <img
+                      src={favicon}
+                      alt=""
+                      className="w-4 h-4 object-contain rounded shrink-0"
+                    />
+                  ) : (
+                    <span className="w-4 h-4 rounded bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center uppercase">
+                      {domain ? domain.charAt(0) : `${idx + 1}`}
+                    </span>
                   )}
                 </div>
+
+                {/* Tab Title */}
+                <span
+                  className={`text-sm truncate leading-tight tracking-tight ${
+                    isDarkTheme && !isAnyTabActive
+                      ? "text-white font-medium"
+                      : ""
+                  } ${isTabActive ? "underline decoration-cyan-500 underline-offset-2" : ""}`}
+                >
+                  {tab.title || domain || `Pane ${idx + 1}`}
+                </span>
               </div>
-            );
-          })
-        )}
+            </React.Fragment>
+          );
+        })}
+      </div>
+
+      {/* Action Buttons */}
+      <div
+        className={`${
+          isSingleColumn || alwaysShowActions
+            ? "flex"
+            : "flex md:hidden md:group-hover/tab:flex"
+        } items-center gap-1 shrink-0 -my-1`}
+      >
+        <button
+          onClick={handleCopySplitView}
+          title={
+            children.length > 1
+              ? `Copy all ${children.length} URLs in split view`
+              : "Copy URL"
+          }
+          className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+            isDarkTheme
+              ? "text-white/70 hover:text-white hover:bg-white/20"
+              : "text-slate-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+          }`}
+        >
+          {splitCopied ? (
+            <Check className="w-3.5 h-3.5 text-emerald-600" />
+          ) : (
+            <Copy className="w-3.5 h-3.5" />
+          )}
+        </button>
+
+        <button
+          onClick={handleOpenSplitView}
+          title={
+            children.length > 1
+              ? `Open all ${children.length} tabs in browser`
+              : "Open URL in browser"
+          }
+          className={`w-5 h-5 flex items-center justify-center rounded-md transition-all ${
+            isDarkTheme
+              ? "text-white/70 hover:text-white hover:bg-white/20"
+              : "text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+          }`}
+        >
+          <ExternalLink className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

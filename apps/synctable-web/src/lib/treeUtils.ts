@@ -10,6 +10,61 @@ export function isValidHttpUrl(url: string | null | undefined): boolean {
 }
 
 /**
+ * Extracts hostname from URL for favicon and domain badges
+ */
+export function getDomain(urlStr: string | null): string {
+  if (!urlStr || !isValidHttpUrl(urlStr)) return "";
+  try {
+    const url = new URL(urlStr);
+    return url.hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Generates Google S2 Favicon URL for a domain
+ */
+export function getFaviconUrl(urlStr: string | null): string {
+  if (!urlStr || !isValidHttpUrl(urlStr)) return "";
+  try {
+    const url = new URL(urlStr);
+    return `https://www.google.com/s2/favicons?domain=${url.hostname}&sz=64`;
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Formats a relative timestamp (e.g. "Just now", "5m ago", "Yesterday")
+ */
+export function formatRelativeTime(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (isNaN(diffMs)) return "Unknown";
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 45) return "Just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour}h ago`;
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay === 1) return "Yesterday";
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return dateString;
+  }
+}
+
+/**
  * Recursively count the number of valid http/https tabs under a node.
  */
 export function countTabs(node: BrowserTreeNode): number {

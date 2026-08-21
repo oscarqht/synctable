@@ -20,8 +20,48 @@ type SessionTab = {
   splitId?: string;
 };
 
-type TabGroup = { id: string; title: string };
+type TabGroup = { id: string; title: string; color?: string | null };
 const SESSION_MAGIC = "SNSS";
+
+const CHROME_GROUP_COLORS: Record<string, string> = {
+  "0": "#5f6368", // Grey
+  "1": "#1a73e8", // Blue
+  "2": "#d93025", // Red
+  "3": "#f9ab00", // Yellow
+  "4": "#1e8e3e", // Green
+  "5": "#d01884", // Pink
+  "6": "#9334e6", // Purple
+  "7": "#129eaf", // Cyan
+  "8": "#e8710a", // Orange
+  grey: "#5f6368",
+  gray: "#5f6368",
+  blue: "#1a73e8",
+  red: "#d93025",
+  yellow: "#f9ab00",
+  green: "#1e8e3e",
+  pink: "#d01884",
+  purple: "#9334e6",
+  cyan: "#129eaf",
+  orange: "#e8710a",
+};
+
+export function parseChromeGroupColor(val: unknown): string | null {
+  if (val == null) return null;
+  if (typeof val === "number" && Number.isFinite(val)) {
+    return CHROME_GROUP_COLORS[String(val)] || null;
+  }
+  if (typeof val === "string") {
+    const s = val.trim().toLowerCase();
+    if (s.startsWith("#")) {
+      if (s.length === 4) {
+        return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`.toLowerCase();
+      }
+      return s.slice(0, 7).toLowerCase();
+    }
+    if (CHROME_GROUP_COLORS[s]) return CHROME_GROUP_COLORS[s];
+  }
+  return null;
+}
 
 function readPickleString(buffer: Buffer, offset: number): string | undefined {
   if (offset + 4 > buffer.length) return undefined;
@@ -87,10 +127,35 @@ function parseSessionSnapshot(sessionFilePath?: string): { tabs: SessionTab[]; g
       value.groupId = payload[presentOffset] !== 0 ? tokenId(payload, groupOffset) : undefined;
     } else if (command === 27 && payload.length >= 24) { // SetTabGroupMetadata2
       const groupId = tokenId(payload, 4);
+      let title: string | undefined;
+      let color: string | null = null;
+
       // Current Chrome stores the title as a UTF-16 pickle at byte 20; older
       // snapshots use a UTF-8 pickle at the same position.
-      const title = readPickleString16(payload, 20) || readPickleString(payload, 20);
-      groups.set(groupId, { id: groupId, title: title || "Tab Group" });
+      const length16 = payload.readInt32LE(20);
+      const byteLength16 = length16 * 2;
+      if (length16 >= 0 && 24 + byteLength16 <= payload.length) {
+        title = payload.subarray(24, 24 + byteLength16).toString("utf16le");
+        const afterTitleOffset = (24 + byteLength16 + 3) & ~3;
+        if (payload.length >= afterTitleOffset + 4) {
+          const colorId = payload.readUInt32LE(afterTitleOffset);
+          color = parseChromeGroupColor(colorId);
+        }
+      }
+
+      if (!title) {
+        const length8 = payload.readInt32LE(20);
+        if (length8 >= 0 && 24 + length8 <= payload.length) {
+          title = payload.subarray(24, 24 + length8).toString("utf8");
+          const afterTitleOffset = (24 + length8 + 3) & ~3;
+          if (payload.length >= afterTitleOffset + 4) {
+            const colorId = payload.readUInt32LE(afterTitleOffset);
+            color = parseChromeGroupColor(colorId);
+          }
+        }
+      }
+
+      groups.set(groupId, { id: groupId, title: title || "Tab Group", color });
     } else if (command === 36 && payload.length >= 25) { // SetSplitTab
       // Chromium serializes SplitTabPayload as an aligned C++ struct:
       // tab ID, four bytes of padding, a 128-bit split token, then has_split.
@@ -133,7 +198,15 @@ export function parseChromePreferences(options: ChromeParserOptions): BrowserTre
   });
 
   const session = parseSessionSnapshot(sessionFilePath);
-  const preferenceGroups = new Map(Object.entries<any>(data?.tab_groups || {}).map(([id, group]) => [id, group?.title]));
+  const preferenceGroups = new Map(
+    Object.entries<any>(data?.tab_groups || {}).map(([id, group]) => [
+      id,
+      {
+        title: typeof group?.title === "string" ? group.title : undefined,
+        color: parseChromeGroupColor(group?.color),
+      },
+    ])
+  );
   const sessionWindowIds = [...new Set(session.tabs.map((item) => item.windowId).filter((id): id is number => id !== undefined))];
   const windowIds = sessionWindowIds.length > 0 ? sessionWindowIds : [0];
 
@@ -147,9 +220,26 @@ export function parseChromePreferences(options: ChromeParserOptions): BrowserTre
     const groupIds = new Set(windowTabs.flatMap((item) => item.groupId ? [item.groupId] : []));
     for (const groupId of groupIds) {
       const group = session.groups.find((item) => item.id === groupId);
-      const title = preferenceGroups.get(groupId) || group?.title || "Tab Group";
+      const prefGroup = preferenceGroups.get(groupId);
+      const title = prefGroup?.title || group?.title || "Tab Group";
+      const theme_color = prefGroup?.color || group?.color || null;
+      const theme_colors = theme_color ? [theme_color] : null;
       const firstTabIndex = Math.min(...windowTabs.filter((item) => item.groupId === groupId).map((item) => item.index));
-      nodes.push({ id: `chrome-${profileName}-group-${groupId}`, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "folder", title, url: null, parent_id: workspaceId, sort_order: firstTabIndex, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
+      nodes.push({
+        id: `chrome-${profileName}-group-${groupId}`,
+        browser_name: "chrome",
+        os_type: osType,
+        profile_name: profileName,
+        node_type: "folder",
+        title,
+        url: null,
+        parent_id: workspaceId,
+        sort_order: firstTabIndex,
+        snapshot_time: snapshotTime,
+        lastUpdateTime: snapshotTime,
+        theme_color,
+        theme_colors,
+      });
     }
 
     const splitIds = new Set(windowTabs.flatMap((item) => item.splitId ? [item.splitId] : []));
@@ -183,8 +273,23 @@ export function parseChromePreferences(options: ChromeParserOptions): BrowserTre
     // yet created a recoverable session snapshot for this profile.
     if (windowTabs.length === 0) {
       let groupIndex = 0;
-      for (const [groupId, title] of preferenceGroups) {
-        nodes.push({ id: `chrome-${profileName}-group-${groupId}`, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "folder", title: title || `Group ${groupIndex + 1}`, url: null, parent_id: workspaceId, sort_order: groupIndex++, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
+      for (const [groupId, prefGroup] of preferenceGroups) {
+        const theme_color = prefGroup.color || null;
+        nodes.push({
+          id: `chrome-${profileName}-group-${groupId}`,
+          browser_name: "chrome",
+          os_type: osType,
+          profile_name: profileName,
+          node_type: "folder",
+          title: prefGroup.title || `Group ${groupIndex + 1}`,
+          url: null,
+          parent_id: workspaceId,
+          sort_order: groupIndex++,
+          snapshot_time: snapshotTime,
+          lastUpdateTime: snapshotTime,
+          theme_color,
+          theme_colors: theme_color ? [theme_color] : null,
+        });
       }
     }
   });

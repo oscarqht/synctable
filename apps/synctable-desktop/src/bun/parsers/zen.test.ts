@@ -134,8 +134,8 @@ describe("parseZenSessionstore", () => {
           },
         ],
         folders: [
-          { id: "folder-later", name: "later", workspaceId: "space-tree", parentId: null },
-          { id: "folder-test", name: "test", workspaceId: "space-tree", parentId: null },
+          { id: "folder-later", name: "later", workspaceId: "space-tree", parentId: null, color: "#e8710a" },
+          { id: "folder-test", name: "test", workspaceId: "space-tree", parentId: null, themeColor: "#1a73e8" },
         ],
         tabs: [
           {
@@ -194,7 +194,9 @@ describe("parseZenSessionstore", () => {
     expect(labWorkspace?.theme_colors).toEqual(["#d9c759", "#5b6ea4"]);
 
     expect(folder?.title).toBe("test");
+    expect(folder?.theme_color).toBe("#1a73e8");
     expect(folder?.parent_id).toBe(workspace?.id);
+    expect(laterFolder?.theme_color).toBe("#e8710a");
     expect(tab).toMatchObject({ parent_id: folder?.id, title: "alpha board" });
     expect(folder?.sort_order).toBe(0);
     expect(laterFolder?.sort_order).toBe(3);

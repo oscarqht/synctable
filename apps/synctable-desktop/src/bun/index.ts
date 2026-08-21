@@ -79,6 +79,8 @@ const rpc = defineElectrobunRPC<SynctableRPCSchema>("bun", {
         db.setDeviceName(deviceName);
         // Invalidate cache so updated device name is reflected
         cachedCloudData = null;
+        inFlightCloudFetch = null;
+        lastCloudFetchTime = 0;
       },
       getRaindropToken: () => {
         return defaultKeychain.getRaindropToken();
@@ -86,9 +88,11 @@ const rpc = defineElectrobunRPC<SynctableRPCSchema>("bun", {
       setRaindropToken: ({ token }) => {
         defaultKeychain.setRaindropToken(token);
         cachedCloudData = null;
+        inFlightCloudFetch = null;
+        lastCloudFetchTime = 0;
       },
-      getCloudData: async () => {
-        return await getCachedOrFreshCloudData();
+      getCloudData: async (params) => {
+        return await getCachedOrFreshCloudData(Boolean(params?.forceRefresh));
       },
       openExternalURL: ({ url }) => {
         if (!url) return;
@@ -112,6 +116,7 @@ const CLOUD_CACHE_TTL_MS = 25000; // 25 seconds cache
 async function getCachedOrFreshCloudData(forceRefresh = false): Promise<CloudSyncResponse> {
   const token = defaultKeychain.getRaindropToken()?.trim();
   if (!token) {
+    cachedCloudData = null;
     return {
       authenticated: false,
       devices: [],
@@ -124,7 +129,7 @@ async function getCachedOrFreshCloudData(forceRefresh = false): Promise<CloudSyn
     return cachedCloudData;
   }
 
-  if (inFlightCloudFetch) {
+  if (!forceRefresh && inFlightCloudFetch) {
     return inFlightCloudFetch;
   }
 

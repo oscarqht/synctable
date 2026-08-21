@@ -9,7 +9,37 @@ export interface FirefoxParserOptions {
   snapshotTime: string;
 }
 
-type FirefoxGroup = { id: string; title?: string; name?: string; label?: string };
+type FirefoxGroup = { id: string; title?: string; name?: string; label?: string; color?: string | number };
+
+const FIREFOX_GROUP_COLORS: Record<string, string> = {
+  blue: "#0060df",
+  turquoise: "#00b3a4",
+  cyan: "#00b3a4",
+  teal: "#00b3a4",
+  green: "#12bc00",
+  yellow: "#d8b200",
+  orange: "#d97000",
+  red: "#d70022",
+  pink: "#b900b9",
+  purple: "#7b00b5",
+  gray: "#5f6368",
+  grey: "#5f6368",
+};
+
+export function parseFirefoxGroupColor(val: unknown): string | null {
+  if (val == null) return null;
+  if (typeof val === "string") {
+    const s = val.trim().toLowerCase();
+    if (s.startsWith("#")) {
+      if (s.length === 4) {
+        return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`.toLowerCase();
+      }
+      return s.slice(0, 7).toLowerCase();
+    }
+    if (FIREFOX_GROUP_COLORS[s]) return FIREFOX_GROUP_COLORS[s];
+  }
+  return null;
+}
 
 function readMozillaSession(filePath: string): any {
   const buffer = readFileSync(filePath);
@@ -77,10 +107,13 @@ export function parseFirefoxSessionData(data: any, options: Omit<FirefoxParserOp
     const groupNodeId = (id: string) => `${windowId}-group-${encodeURIComponent(id)}`;
     groupIds.forEach((groupId) => {
       const group = groups.get(groupId);
+      const theme_color = parseFirefoxGroupColor(group?.color);
+      const theme_colors = theme_color ? [theme_color] : null;
       nodes.push({
         id: groupNodeId(groupId), browser_name: "firefox", os_type: osType, profile_name: profileName, node_type: "folder",
         title: group?.title || group?.name || group?.label || "Tab Group", url: null, parent_id: workspaceId,
         sort_order: firstTabIndex((tab) => String(groupIdFor(tab)) === groupId), snapshot_time: snapshotTime, lastUpdateTime: snapshotTime,
+        theme_color, theme_colors,
       });
     });
 

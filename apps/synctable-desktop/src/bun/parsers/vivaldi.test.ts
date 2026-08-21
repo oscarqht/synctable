@@ -148,4 +148,28 @@ describe("parseVivaldiPreferences", () => {
     expect(windows).toHaveLength(2);
     expect(nodes.filter((node) => node.node_type === "folder" && node.title === "stack")).toHaveLength(1);
   });
+
+  test("extracts Vivaldi tab stack colors from tabData", () => {
+    const dir = mkdtempSync(join(tmpdir(), "synctable-vivaldi-"));
+    tempDirs.push(dir);
+    const preferences = join(dir, "Preferences");
+    const session = join(dir, "Session_test");
+    writeFileSync(preferences, "{}");
+    writeFileSync(session, Buffer.concat([
+      Buffer.from([0x53, 0x4e, 0x53, 0x53, 3, 0, 0, 0]),
+      command(0, Buffer.from([10, 0, 0, 0, 42, 0, 0, 0])), command(2, Buffer.from([42, 0, 0, 0, 0, 0, 0, 0])),
+      navigation(42, "https://example.com/orange-stack"),
+      tabData(42, { group: "orange-stack-id", fixedGroupTitle: "Orange Stack", groupColor: "color9" }),
+      command(0, Buffer.from([10, 0, 0, 0, 43, 0, 0, 0])), command(2, Buffer.from([43, 0, 0, 0, 1, 0, 0, 0])),
+      navigation(43, "https://example.com/blue-stack"),
+      tabData(43, { group: "blue-stack-id", fixedGroupTitle: "Blue Stack", groupColor: "color2" }),
+    ]));
+    const nodes = parseVivaldiPreferences({ filePath: preferences, sessionFilePath: session, osType: "macos", profileName: "Default", snapshotTime: "now" });
+    const orangeStack = nodes.find((node) => node.node_type === "folder" && node.title === "Orange Stack");
+    expect(orangeStack?.theme_color).toBe("#fa903e");
+    expect(orangeStack?.theme_colors).toEqual(["#fa903e"]);
+    const blueStack = nodes.find((node) => node.node_type === "folder" && node.title === "Blue Stack");
+    expect(blueStack?.theme_color).toBe("#1a73e9");
+    expect(blueStack?.theme_colors).toEqual(["#1a73e9"]);
+  });
 });

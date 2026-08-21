@@ -186,19 +186,12 @@ export function DeviceCard({
                     )}
                   </div>
                   {/* Arrange each workspace as a separate card in the grid */}
-                  <div
-                    className={
-                      workspaces.length === 1
-                        ? "grid grid-cols-1 gap-4 items-start"
-                        : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start"
-                    }
-                  >
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 items-start">
                     {workspaces.map((wsItem) => (
                       <ZenSidebarView
                         key={wsItem.id}
                         workspaceItem={wsItem}
                         searchQuery={searchQuery}
-                        isSingleColumn={workspaces.length === 1}
                         onOpenExternal={onOpenExternal}
                       />
                     ))}

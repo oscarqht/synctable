@@ -342,7 +342,18 @@ export function parseArcSidebar(options: ArcParserOptions): BrowserTreeNode[] {
           return;
         }
         if (kind === "list" || kind === "tabGroup" || children.length > 0) {
-          addNode({ id: itemIdForTree, node_type: "folder", title: item.title || item.data?.tabGroup?.title || "Folder", url: null, parent_id: parentId, sort_order: sortOrder });
+          const { theme_color, theme_colors, icon } = extractArcSpaceTheme(item);
+          addNode({
+            id: itemIdForTree,
+            node_type: "folder",
+            title: item.title || item.data?.tabGroup?.title || "Folder",
+            url: null,
+            parent_id: parentId,
+            sort_order: sortOrder,
+            theme_color,
+            theme_colors,
+            icon,
+          });
           children.forEach((child, index) => walk(child, itemIdForTree, index, pinned));
           return;
         }

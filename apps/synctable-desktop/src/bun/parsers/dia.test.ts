@@ -110,14 +110,27 @@ describe("buildDiaNodes", () => {
           { id: "test-w1", node_id: "test-window-1", focused_space_id: "test-space" },
           { id: "test-w2", node_id: "test-window-2", focused_space_id: "test-space" },
         ],
+        spaces: [{ id: "test-space", title: "Test", theme: "green" }],
         tab_groups: [
-          { id: "foo-record", node_id: "foo-node", title: "foo" },
-          { id: "group3-record", node_id: "group3-node", title: "Group 3" },
+          { id: "foo-record", node_id: "foo-node", title: "foo", theme: "blue", icon: "{\"emoji\":\"🧪\"}" },
+          { id: "group3-record", node_id: "group3-node", title: "Group 3", theme: "yellow" },
         ],
         content_panes: testPages.map((page) => page.pane),
         web_contents: testPages.map((page) => page.web),
       }),
     ] }, { osType: "macos", snapshotTime: timestamp });
+
+    const fooFolder = nodes.find((node) => node.node_type === "folder" && node.title === "foo");
+    expect(fooFolder?.theme_color).toBe("#1a73e8");
+    expect(fooFolder?.theme_colors).toEqual(["#1a73e8"]);
+    expect(fooFolder?.icon).toBe("🧪");
+
+    const group3Folder = nodes.find((node) => node.node_type === "folder" && node.title === "Group 3");
+    expect(group3Folder?.theme_color).toBe("#f9ab00");
+    expect(group3Folder?.theme_colors).toEqual(["#f9ab00"]);
+
+    const testWorkspace = nodes.find((node) => node.node_type === "workspace" && node.title === "Test");
+    expect(testWorkspace?.theme_color).toBe("#1e8e3e");
 
     const children = (parentId: string) => nodes
       .filter((node) => node.parent_id === parentId)

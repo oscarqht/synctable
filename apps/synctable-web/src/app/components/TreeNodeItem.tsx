@@ -16,8 +16,7 @@ import {
   Compass,
 } from "lucide-react";
 import type { BrowserTreeNode, NodeType } from "@/lib/types";
-import { countTabs, isDarkColor, getWorkspaceGradientStyle } from "@/lib/treeUtils";
-import { getDomain, getFaviconUrl } from "./zen/ZenTabItem";
+import { countTabs, getAllTabUrls, isDarkColor, getDomain, getFaviconUrl, getWorkspaceGradientStyle } from "@/lib/treeUtils";
 import { ZenFolderIcon } from "./zen/ZenFolderIcon";
 import { ZenSplitViewItem } from "./zen/ZenSplitViewItem";
 
@@ -222,12 +221,32 @@ export function TreeNodeItem({
   const favicon = getFaviconUrl(node.url);
   const domain = getDomain(node.url);
 
+  const nodeUrls = React.useMemo(() => {
+    if (node.url) return [node.url];
+    return getAllTabUrls(node);
+  }, [node]);
+
   const handleCopyUrl = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (node.url) {
-      navigator.clipboard.writeText(node.url);
+    e.preventDefault();
+    if (nodeUrls.length > 0) {
+      navigator.clipboard.writeText(nodeUrls.join("\n"));
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
+    }
+  };
+
+  const handleOpenLink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (nodeUrls.length > 0) {
+      if (onOpenExternal) {
+        nodeUrls.forEach((url) => onOpenExternal(url));
+      } else {
+        nodeUrls.forEach((url) => {
+          window.open(url, "_blank", "noopener,noreferrer");
+        });
+      }
     }
   };
 
@@ -301,11 +320,41 @@ export function TreeNodeItem({
             )}
           </div>
         ) : isFolder ? (
-          /* Zen Signature 3D Folder Flap */
+          /* Zen Signature 3D Folder Flap / Custom Emoji */
           <div className="flex items-center gap-1.5 shrink-0">
-            <ZenFolderIcon isOpen={expanded} size={20} />
-            <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-200 dark:border-amber-800">
-              Folder
+            {node.icon ? (
+              <span className="text-sm shrink-0 leading-none">{node.icon}</span>
+            ) : (
+              <ZenFolderIcon
+                isOpen={expanded}
+                size={20}
+                color={
+                  node.theme_color ||
+                  (node.theme_colors && node.theme_colors.length > 0
+                    ? node.theme_colors[0]
+                    : undefined)
+                }
+              />
+            )}
+            <span
+              style={
+                node.theme_color
+                  ? {
+                      backgroundColor: `${node.theme_color}18`,
+                      borderColor: `${node.theme_color}50`,
+                      color: node.theme_color,
+                    }
+                  : undefined
+              }
+              className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-200 dark:border-amber-800 flex items-center gap-1"
+            >
+              <span>Folder</span>
+              {node.theme_color && (
+                <span
+                  className="w-1.5 h-1.5 rounded-full inline-block"
+                  style={{ backgroundColor: node.theme_color }}
+                />
+              )}
             </span>
           </div>
         ) : isWorkspace ? (
@@ -371,8 +420,8 @@ export function TreeNodeItem({
           )}
         </div>
 
-        {/* Actions for Tab Nodes */}
-        {node.url && (
+        {/* Actions for Tab / Workspace / Folder Nodes */}
+        {nodeUrls.length > 0 && (
           <div
             className={`${
               isSingleColumn || alwaysShowActions
@@ -382,7 +431,11 @@ export function TreeNodeItem({
           >
             <button
               onClick={handleCopyUrl}
-              title="Copy URL"
+              title={
+                node.url
+                  ? "Copy URL"
+                  : `Copy all ${nodeUrls.length} tab URLs`
+              }
               className="w-5 h-5 flex items-center justify-center rounded-md text-slate-400 hover:text-cyan-700 hover:bg-cyan-50 dark:hover:bg-slate-800 border border-transparent hover:border-cyan-200 transition-all"
             >
               {copied ? (
@@ -392,16 +445,8 @@ export function TreeNodeItem({
               )}
             </button>
             <a
-              href={node.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (onOpenExternal && node.url) {
-                  e.preventDefault();
-                  onOpenExternal(node.url);
-                }
-              }}
+              href={node.url || "#"}
+              onClick={handleOpenLink}
               title="Open tab in new window"
               className="w-5 h-5 flex items-center justify-center rounded-md text-slate-400 hover:text-indigo-700 hover:bg-indigo-50 dark:hover:bg-slate-800 border border-transparent hover:border-indigo-200 transition-all"
             >
@@ -413,7 +458,14 @@ export function TreeNodeItem({
 
       {/* Children Nodes (Recursive) */}
       {hasChildren && expanded && (
-        <div className="flex flex-col border-l border-slate-200/70 dark:border-slate-800 ml-4 pl-1 space-y-0.5">
+        <div
+          style={
+            isFolder && node.theme_color
+              ? { borderLeftColor: `${node.theme_color}60` }
+              : undefined
+          }
+          className="flex flex-col border-l border-slate-200/70 dark:border-slate-800 ml-4 pl-1 space-y-0.5"
+        >
           {node.children!
             .filter((child) => countTabs(child) > 0)
             .map((child) => (

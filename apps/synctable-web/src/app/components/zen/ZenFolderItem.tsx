@@ -43,6 +43,12 @@ export function ZenFolderItem({
     return null;
   }
 
+  const folderColor =
+    folder.theme_color ||
+    (folder.theme_colors && folder.theme_colors.length > 0
+      ? folder.theme_colors[0]
+      : null);
+
   if (isCompact) {
     return (
       <div
@@ -52,7 +58,7 @@ export function ZenFolderItem({
           isDarkTheme ? "hover:bg-white/20 text-white" : "hover:bg-slate-200/60 dark:hover:bg-slate-800/60"
         }`}
       >
-        <ZenFolderIcon isOpen={isOpen} size={22} />
+        <ZenFolderIcon isOpen={isOpen} size={22} color={folderColor} />
       </div>
     );
   }
@@ -68,14 +74,25 @@ export function ZenFolderItem({
             : "hover:bg-slate-200/50 dark:hover:bg-slate-800/50"
         }`}
       >
-        {/* Blue Outline Folder Icon */}
-        <ZenFolderIcon isOpen={isOpen} size={22} />
+        {/* Color Outline Folder Icon or Emoji */}
+        {folder.icon ? (
+          <span className="text-base shrink-0 leading-none">{folder.icon}</span>
+        ) : (
+          <ZenFolderIcon isOpen={isOpen} size={22} color={folderColor} />
+        )}
 
         {/* Folder Title */}
-        <span className={`text-sm font-bold truncate flex-1 leading-tight tracking-tight ${
+        <span className={`text-sm font-bold truncate flex-1 leading-tight tracking-tight flex items-center gap-2 ${
           isDarkTheme ? "text-white" : "text-slate-900 dark:text-slate-100"
         }`}>
-          {folder.title || "Folder"}
+          <span>{folder.title || "Folder"}</span>
+          {folderColor && (
+            <span
+              className="w-2 h-2 rounded-full shrink-0 shadow-2xs"
+              style={{ backgroundColor: folderColor }}
+              title={`Color: ${folderColor}`}
+            />
+          )}
         </span>
       </div>
 
@@ -105,6 +122,7 @@ export function ZenFolderItem({
                 <ZenSplitViewItem
                   key={child.id || `split_${idx}`}
                   node={child}
+                  activeTabId={activeTabId}
                   isCompact={isCompact}
                   isDarkTheme={isDarkTheme}
                   isSingleColumn={isSingleColumn}

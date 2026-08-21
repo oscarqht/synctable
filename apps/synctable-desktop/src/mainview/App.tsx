@@ -31,10 +31,9 @@ export function App({ rpc }: AppProps) {
   // Load preferences
   const loadPreferences = useCallback(async () => {
     try {
-      const prefs = await rpc.request.getPreferences();
-      setSavedDeviceName(prefs.deviceName || "");
-      const token = await rpc.request.getRaindropToken();
-      setSavedRaindropToken(token || "");
+      const prefs = await rpc.request.getAppPreferences();
+      setSavedDeviceName(prefs?.deviceName || "");
+      setSavedRaindropToken(prefs?.raindropToken || "");
     } catch (err) {
       console.error("Failed to load preferences:", err);
     }
@@ -54,10 +53,12 @@ export function App({ rpc }: AppProps) {
 
   // Load cloud multi-device data
   const loadCloudData = useCallback(
-    async (isBackground = false) => {
+    async (isBackground = false, forceRefresh = false) => {
       if (!isBackground) setCloudLoading(true);
       try {
-        const data: SynctableSyncResponse = await rpc.request.getCloudData();
+        const data: SynctableSyncResponse = await rpc.request.getCloudData(
+          forceRefresh ? { forceRefresh: true } : undefined
+        );
         if (data.authenticated && !data.error) {
           setCloudData(data);
         } else if (data.error) {
@@ -123,11 +124,11 @@ export function App({ rpc }: AppProps) {
   const handleSyncNow = async () => {
     setLocalSyncing(true);
     try {
-      const result = await rpc.request.syncNow();
+      const result = await rpc.request.triggerSync();
       if (result.success) {
         await loadLocalData();
         if (activeTab === "cloud") {
-          await loadCloudData(true);
+          await loadCloudData(true, true);
         }
       }
     } catch (err) {
@@ -146,7 +147,8 @@ export function App({ rpc }: AppProps) {
   const handleSaveToken = async (token: string) => {
     await rpc.request.setRaindropToken({ token });
     setSavedRaindropToken(token);
-    await loadCloudData();
+    await loadPreferences();
+    await loadCloudData(false, true);
   };
 
   // Handle Save Full Settings
@@ -155,8 +157,9 @@ export function App({ rpc }: AppProps) {
     await rpc.request.setRaindropToken({ token });
     setSavedDeviceName(deviceName);
     setSavedRaindropToken(token);
+    await loadPreferences();
     await loadLocalData();
-    await loadCloudData();
+    await loadCloudData(false, true);
   };
 
   const validDevicesCount = (cloudData?.devices || []).filter(
@@ -279,7 +282,7 @@ export function App({ rpc }: AppProps) {
             <MultiDeviceCardsPortal
               data={cloudData}
               loading={cloudLoading}
-              onRefresh={() => loadCloudData(false)}
+              onRefresh={() => loadCloudData(false, true)}
               onOpenExternal={handleOpenExternal}
               onSaveToken={handleSaveToken}
               onSwitchToLocal={() => setActiveTab("local")}

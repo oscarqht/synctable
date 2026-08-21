@@ -12,7 +12,7 @@ describe("parseFirefoxSessionData", () => {
     const nodes = parseFirefoxSessionData({
       windows: [
         {
-          groups: [{ id: "research", name: "Research" }],
+          groups: [{ id: "research", name: "Research", color: "orange" }],
           splitViews: [{ id: 7, numberOfTabs: 2 }],
           tabs: [
             { entries: [{ url: "https://start.example", title: "Start" }], index: 1, pinned: true },
@@ -39,7 +39,7 @@ describe("parseFirefoxSessionData", () => {
 
     expect(windows.map((node) => node.sort_order)).toEqual([0, 1]);
     expect(start).toMatchObject({ node_type: "pinned_tab", sort_order: 0 });
-    expect(group).toMatchObject({ sort_order: 1 });
+    expect(group).toMatchObject({ sort_order: 1, theme_color: "#d97000", theme_colors: ["#d97000"] });
     expect(docs).toMatchObject({ parent_id: group?.id, sort_order: 1 });
     expect(splitView).toMatchObject({ title: "Split View", parent_id: group?.id, sort_order: 2 });
     expect(splitTabs.map((node) => ({ url: node.url, sort_order: node.sort_order }))).toEqual([

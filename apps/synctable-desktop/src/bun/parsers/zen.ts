@@ -284,6 +284,7 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
       const parentId = folder?.parentId != null
         ? folderIds.get(String(folder.parentId)) || getWorkspaceId(folder.workspaceId)
         : getWorkspaceId(folder.workspaceId);
+      const { theme_color, theme_colors, icon } = extractZenSpaceTheme(folder);
       nodes.push({
         id: folderId,
         browser_name: "zen",
@@ -298,6 +299,9 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
         sort_order: folderSortOrders.get(String(folder.id)) ?? folderIdx,
         snapshot_time: snapshotTime,
         lastUpdateTime: snapshotTime,
+        theme_color,
+        theme_colors,
+        icon,
       });
     });
 

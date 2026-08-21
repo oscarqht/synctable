@@ -44,6 +44,79 @@ interface DiaNode {
 interface DiaSpace {
   id: string;
   title: string;
+  theme?: string | null;
+}
+
+const DIA_GROUP_COLORS: Record<string, string> = {
+  "0": "#5f6368", // Grey
+  "1": "#1a73e8", // Blue
+  "2": "#d93025", // Red
+  "3": "#f9ab00", // Yellow
+  "4": "#1e8e3e", // Green
+  "5": "#d01884", // Pink
+  "6": "#9334e6", // Purple
+  "7": "#129eaf", // Cyan
+  "8": "#e8710a", // Orange
+  neutral: "#5f6368",
+  grey: "#5f6368",
+  gray: "#5f6368",
+  blue: "#1a73e8",
+  red: "#d93025",
+  yellow: "#f9ab00",
+  green: "#1e8e3e",
+  pink: "#d01884",
+  purple: "#9334e6",
+  cyan: "#129eaf",
+  teal: "#129eaf",
+  orange: "#e8710a",
+};
+
+export function parseDiaColor(val: unknown): string | null {
+  if (val == null) return null;
+  if (typeof val === "number" && Number.isFinite(val)) {
+    return DIA_GROUP_COLORS[String(val)] || null;
+  }
+  if (typeof val === "string") {
+    const s = val.trim().toLowerCase();
+    if (!s) return null;
+    if (s.startsWith("#")) {
+      if (s.length === 4) {
+        return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`.toLowerCase();
+      }
+      return s.slice(0, 7).toLowerCase();
+    }
+    if (s.startsWith("rgb")) {
+      return s;
+    }
+    const clean = s.replace(/[-_]/g, "");
+    if (DIA_GROUP_COLORS[clean]) return DIA_GROUP_COLORS[clean];
+    if (DIA_GROUP_COLORS[s]) return DIA_GROUP_COLORS[s];
+  }
+  return null;
+}
+
+export function parseDiaIcon(val: unknown): string | null {
+  if (!val) return null;
+  if (typeof val === "string") {
+    const s = val.trim();
+    if (!s) return null;
+    if (s.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(s);
+        if (typeof parsed?.emoji === "string" && parsed.emoji) return parsed.emoji;
+        if (typeof parsed?.icon === "string" && parsed.icon) return parsed.icon;
+      } catch {
+        // Not JSON
+      }
+    }
+    return s;
+  }
+  if (typeof val === "object" && val !== null) {
+    const obj = val as Record<string, unknown>;
+    if (typeof obj.emoji === "string" && obj.emoji) return obj.emoji;
+    if (typeof obj.icon === "string" && obj.icon) return obj.icon;
+  }
+  return null;
 }
 
 interface DiaWindow {
@@ -144,6 +217,7 @@ export function buildDiaNodes(
         : [{ id: window.focusedSpaceId || profile.directory, title: profile.directory }];
       for (const space of spaces) {
         const spaceId = `${windowId}-profile-${encodeURIComponent(profile.directory)}-space-${encodeURIComponent(space.id)}`;
+        const spaceColor = parseDiaColor(space.theme);
         output.push(treeNode(
           spaceId,
           "workspace",
@@ -153,6 +227,7 @@ export function buildDiaNodes(
           spaceOrder++,
           options,
           profileName,
+          spaceColor,
         ));
         appendSpaceItems(output, profile, window, space, spaceId, options, profileName);
       }
@@ -188,6 +263,7 @@ function buildProfileModel(database: DiaDatabaseDump): ProfileModel {
   const spaces = (rows.spaces || []).map((row) => ({
     id: stringValue(row, "id"),
     title: stringValue(row, "title") || directory,
+    theme: nullableString(row, "theme", "color", "theme_color", "themeColor"),
   })).filter((space) => space.id);
 
   const windowRows = new Map((rows.windows || []).map((row) => [stringValue(row, "node_id", "nodeID", "nodeId"), row]));
@@ -255,7 +331,11 @@ function appendLogicalNode(
   if (source.kind === "group") {
     const record = findEntityRow(profile.rows.tab_groups || [], source);
     const title = record ? stringValue(record, "title") : "Tab Group";
-    output.push(treeNode(id, "folder", title || "Tab Group", null, parentId, sortOrder, options, profileName));
+    const rawColor = record ? nullableString(record, "theme", "color", "theme_color", "themeColor", "color_hex", "colorHex") : null;
+    const color = parseDiaColor(rawColor);
+    const rawIcon = record ? nullableString(record, "icon", "custom_icon", "customIcon") : null;
+    const icon = parseDiaIcon(rawIcon);
+    output.push(treeNode(id, "folder", title || "Tab Group", null, parentId, sortOrder, options, profileName, color, icon));
     const children = (profile.childrenByParent.get(source.id) || [])
       .filter((child) => child.kind === "tab" || child.kind === "group");
     children.forEach((child, index) => appendLogicalNode(
@@ -284,11 +364,13 @@ function appendLogicalNode(
       index,
       options,
       profileName,
+      null,
+      metadata.icon,
     )));
     return;
   }
 
-  const metadata = panes[0]?.metadata || { title: "New Tab", url: null };
+  const metadata = panes[0]?.metadata || { title: "New Tab", url: null, icon: null };
   output.push(treeNode(
     id,
     pinned ? "pinned_tab" : "tab",
@@ -298,10 +380,12 @@ function appendLogicalNode(
     sortOrder,
     options,
     profileName,
+    null,
+    metadata.icon,
   ));
 }
 
-function tabPanes(profile: ProfileModel, tabNode: DiaNode): Array<{ node: DiaNode; metadata: { title: string; url: string | null } }> {
+function tabPanes(profile: ProfileModel, tabNode: DiaNode): Array<{ node: DiaNode; metadata: { title: string; url: string | null; icon?: string | null } }> {
   const paneNodes: DiaNode[] = [];
   const visit = (node: DiaNode) => {
     for (const child of profile.childrenByParent.get(node.id) || []) {
@@ -324,7 +408,9 @@ function tabPanes(profile: ProfileModel, tabNode: DiaNode): Array<{ node: DiaNod
       || (web ? stringValue(web, "title") : "")
       || (isNewTabUrl(url) ? "New Tab" : url)
       || "New Tab";
-    return [{ node: paneNode, metadata: { title, url } }];
+    const rawIcon = nullableString(pane, "custom_icon", "customIcon");
+    const icon = parseDiaIcon(rawIcon);
+    return [{ node: paneNode, metadata: { title, url, icon } }];
   });
 }
 
@@ -377,6 +463,8 @@ function treeNode(
   sortOrder: number,
   options: Pick<DiaParserOptions, "osType" | "snapshotTime">,
   profileName: string,
+  themeColor: string | null = null,
+  icon: string | null = null,
 ): BrowserTreeNode {
   return {
     id,
@@ -390,5 +478,8 @@ function treeNode(
     sort_order: sortOrder,
     snapshot_time: options.snapshotTime,
     lastUpdateTime: options.snapshotTime,
+    theme_color: themeColor,
+    theme_colors: themeColor ? [themeColor] : null,
+    icon: icon || undefined,
   };
 }

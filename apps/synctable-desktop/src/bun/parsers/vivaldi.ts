@@ -9,9 +9,65 @@ export interface VivaldiParserOptions {
   snapshotTime: string;
 }
 
-type SessionTab = { id: number; windowId?: number; index: number; url?: string; title?: string; pinned: boolean; groupId?: string; groupTitle?: string; workspaceId?: string; tiling?: { id: string; index: number }; vivaldiGroup?: boolean };
-type TabGroup = { id: string; title: string };
+type SessionTab = { id: number; windowId?: number; index: number; url?: string; title?: string; pinned: boolean; groupId?: string; groupTitle?: string; groupColor?: string; workspaceId?: string; tiling?: { id: string; index: number }; vivaldiGroup?: boolean };
+type TabGroup = { id: string; title: string; color?: string | null };
 const SESSION_MAGIC = "SNSS";
+
+const VIVALDI_GROUP_COLORS: Record<string, string> = {
+  "0": "#606469", // Grey (Chromium enum 0)
+  "1": "#1a73e9", // Blue (Chromium enum 1)
+  "2": "#e3000e", // Red (Chromium enum 2)
+  "3": "#faab00", // Yellow (Chromium enum 3)
+  "4": "#178038", // Green (Chromium enum 4)
+  "5": "#d01884", // Pink (Chromium enum 5)
+  "6": "#a242f4", // Purple (Chromium enum 6)
+  "7": "#007d85", // Cyan/Teal (Chromium enum 7)
+  "8": "#fa903e", // Orange (Chromium enum 8)
+  "9": "#fa903e", // Orange (1-based index 9)
+  color1: "#606469", // Grey
+  color2: "#1a73e9", // Blue
+  color3: "#e3000e", // Red
+  color4: "#faab00", // Yellow
+  color5: "#178038", // Green
+  color6: "#d01884", // Pink
+  color7: "#a242f4", // Purple
+  color8: "#007d85", // Teal / Cyan
+  color9: "#fa903e", // Orange
+  grey: "#606469",
+  gray: "#606469",
+  blue: "#1a73e9",
+  red: "#e3000e",
+  yellow: "#faab00",
+  green: "#178038",
+  pink: "#d01884",
+  purple: "#a242f4",
+  teal: "#007d85",
+  cyan: "#007d85",
+  orange: "#fa903e",
+};
+
+export function parseVivaldiGroupColor(val: unknown): string | null {
+  if (val == null) return null;
+  if (typeof val === "number" && Number.isFinite(val)) {
+    return VIVALDI_GROUP_COLORS[String(val)] || null;
+  }
+  if (typeof val === "string") {
+    const s = val.trim().toLowerCase();
+    if (s.startsWith("#")) {
+      if (s.length === 4) {
+        return `#${s[1]}${s[1]}${s[2]}${s[2]}${s[3]}${s[3]}`.toLowerCase();
+      }
+      return s.slice(0, 7).toLowerCase();
+    }
+    if (s.startsWith("rgb")) {
+      return s;
+    }
+    const clean = s.replace(/[-_]/g, "");
+    if (VIVALDI_GROUP_COLORS[clean]) return VIVALDI_GROUP_COLORS[clean];
+    if (VIVALDI_GROUP_COLORS[s]) return VIVALDI_GROUP_COLORS[s];
+  }
+  return null;
+}
 
 function readPickleString(buffer: Buffer, offset: number): string | undefined {
   if (offset + 4 > buffer.length) return undefined;
@@ -77,8 +133,28 @@ function parseSessionSnapshot(sessionFilePath?: string): { tabs: SessionTab[]; g
       if (payload[20] !== 0) value.groupId = tokenId(payload, 4);
     } else if (command === 27 && payload.length >= 24) { // SetTabGroupMetadata2
       const groupId = tokenId(payload, 4);
-      const title = readPickleString(payload, 20);
-      groups.set(groupId, { id: groupId, title: title || "Tab Group" });
+      let title: string | undefined;
+      let color: string | null = null;
+      const length16 = payload.readInt32LE(20);
+      const byteLength16 = length16 * 2;
+      if (length16 >= 0 && 24 + byteLength16 <= payload.length) {
+        title = payload.subarray(24, 24 + byteLength16).toString("utf16le");
+        const afterTitleOffset = (24 + byteLength16 + 3) & ~3;
+        if (payload.length >= afterTitleOffset + 4) {
+          color = parseVivaldiGroupColor(payload.readUInt32LE(afterTitleOffset));
+        }
+      }
+      if (!title) {
+        const length8 = payload.readInt32LE(20);
+        if (length8 >= 0 && 24 + length8 <= payload.length) {
+          title = payload.subarray(24, 24 + length8).toString("utf8");
+          const afterTitleOffset = (24 + length8 + 3) & ~3;
+          if (payload.length >= afterTitleOffset + 4) {
+            color = parseVivaldiGroupColor(payload.readUInt32LE(afterTitleOffset));
+          }
+        }
+      }
+      groups.set(groupId, { id: groupId, title: title || "Tab Group", color });
     } else if (command === 16 && payload.length >= 4) { // TabClosed
       tabs.delete(payload.readInt32LE(0));
     } else if (command === 21 && payload.length >= 12) { // Vivaldi SetTabData
@@ -86,13 +162,24 @@ function parseSessionSnapshot(sessionFilePath?: string): { tabs: SessionTab[]; g
       const json = readPickleString(payload, 8);
       if (!json) continue;
       try {
-        const data = JSON.parse(json) as { fixedTitle?: unknown; group?: unknown; fixedGroupTitle?: unknown; workspaceId?: unknown; tiling?: { id?: unknown; index?: unknown } };
+        const data = JSON.parse(json) as {
+          fixedTitle?: unknown;
+          group?: unknown;
+          fixedGroupTitle?: unknown;
+          groupColor?: unknown;
+          color?: unknown;
+          themeColor?: unknown;
+          workspaceId?: unknown;
+          tiling?: { id?: unknown; index?: unknown };
+        };
         if (typeof data.fixedTitle === "string" && data.fixedTitle) value.title = data.fixedTitle;
         // Vivaldi writes the complete current tab-data object. Therefore an omitted
         // group/title clears an older value in the append-only session log.
         value.vivaldiGroup = true;
         value.groupId = typeof data.group === "string" && data.group ? data.group : undefined;
         value.groupTitle = typeof data.fixedGroupTitle === "string" && data.fixedGroupTitle ? data.fixedGroupTitle : undefined;
+        const rawColor = data.groupColor ?? data.color ?? data.themeColor;
+        value.groupColor = parseVivaldiGroupColor(rawColor) || (typeof rawColor === "string" && rawColor.startsWith("#") ? rawColor : undefined);
         // Workspace membership is stored with Vivaldi's tab metadata, rather than
         // the Chromium session records. Missing metadata means Vivaldi's default
         // workspace; it must not fall through to the first named workspace.
@@ -111,10 +198,11 @@ function parseSessionSnapshot(sessionFilePath?: string): { tabs: SessionTab[]; g
   }
   for (const value of tabs.values()) {
     if (!value.vivaldiGroup || !value.groupId) continue;
-    const group = groups.get(value.groupId) || { id: value.groupId, title: "Tab Stack" };
+    const group = groups.get(value.groupId) || { id: value.groupId, title: "Tab Stack", color: null };
     // An unnamed Vivaldi stack displays the first tab title as its label.
     if (value.groupTitle) group.title = value.groupTitle;
     else if (group.title === "Tab Stack") group.title = value.title || "Tab Stack";
+    if (value.groupColor) group.color = value.groupColor;
     groups.set(value.groupId, group);
   }
   return { tabs: [...tabs.values()].filter((item) => item.url), groups: [...groups.values()] };
@@ -132,6 +220,16 @@ export function parseVivaldiPreferences(options: VivaldiParserOptions): BrowserT
   const rootId = `vivaldi-${osType}-${profileName}-root`;
   const session = parseSessionSnapshot(sessionFilePath);
   nodes.push({ id: rootId, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "root", title: `Vivaldi (${profileName})`, url: null, parent_id: null, sort_order: 0, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
+
+  const preferenceGroups = new Map(
+    Object.entries<any>(data?.tab_groups || data?.vivaldi?.tab_groups || {}).map(([id, group]) => [
+      id,
+      {
+        title: typeof group?.title === "string" ? group.title : undefined,
+        color: parseVivaldiGroupColor(group?.color),
+      },
+    ])
+  );
 
   const workspaceItems = Array.isArray(data?.vivaldi?.workspaces?.list) ? data.vivaldi.workspaces.list : [];
   const workspaces: { id: string; title: string }[] = workspaceItems.length > 0
@@ -164,10 +262,32 @@ export function parseVivaldiPreferences(options: VivaldiParserOptions): BrowserT
       .filter((group) => windowGroupIds.has(group.id))
       .map((group) => {
         const groupTabs = windowTabs.filter((item) => item.groupId === group.id);
-        return { group, workspaceId: workspaceNodeId(groupTabs[0]?.workspaceId), firstTabIndex: Math.min(...groupTabs.map((item) => item.index)) };
+        const prefGroup = preferenceGroups.get(group.id);
+        const color = prefGroup?.color || group.color || groupTabs.find((t) => t.groupColor)?.groupColor || null;
+        return {
+          group: { ...group, color },
+          workspaceId: workspaceNodeId(groupTabs[0]?.workspaceId),
+          firstTabIndex: Math.min(...groupTabs.map((item) => item.index)),
+        };
       });
     const groupNodeId = (groupId: string) => `vivaldi-${profileName}-win-${sourceWindowId}-group-${groupId}`;
-    groups.forEach(({ group, workspaceId, firstTabIndex }) => nodes.push({ id: groupNodeId(group.id), browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "folder", title: group.title, url: null, parent_id: workspaceId, sort_order: firstTabIndex, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime }));
+    groups.forEach(({ group, workspaceId, firstTabIndex }) =>
+      nodes.push({
+        id: groupNodeId(group.id),
+        browser_name: "vivaldi",
+        os_type: osType,
+        profile_name: profileName,
+        node_type: "folder",
+        title: group.title,
+        url: null,
+        parent_id: workspaceId,
+        sort_order: firstTabIndex,
+        snapshot_time: snapshotTime,
+        lastUpdateTime: snapshotTime,
+        theme_color: group.color || null,
+        theme_colors: group.color ? [group.color] : null,
+      })
+    );
     const windowSplitIds = new Set(windowTabs.flatMap((item) => item.tiling ? [item.tiling.id] : []));
     const splits = [...windowSplitIds].map((splitId) => {
       const splitTabs = windowTabs.filter((item) => item.tiling?.id === splitId);
