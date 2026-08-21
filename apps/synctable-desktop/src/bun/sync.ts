@@ -8,21 +8,23 @@ import { defaultKeychain, KeychainService } from "./keychain";
 import { defaultRaindropClient, RaindropClient } from "./raindrop";
 
 export function canonicalizeTree(nodes: BrowserTreeNode[]): any {
-  return nodes.map((node) => ({
-    id: node.id,
-    browser_name: node.browser_name,
-    os_type: node.os_type,
-    profile_name: node.profile_name,
-    node_type: node.node_type,
-    title: node.title,
-    url: node.url,
-    parent_id: node.parent_id,
-    sort_order: node.sort_order,
-    theme_color: node.theme_color ?? null,
-    theme_colors: node.theme_colors ?? null,
-    icon: node.icon ?? null,
-    children: node.children ? canonicalizeTree(node.children) : [],
-  }));
+  return nodes
+    .map((node) => ({
+      id: node.id,
+      browser_name: node.browser_name,
+      os_type: node.os_type,
+      profile_name: node.profile_name,
+      node_type: node.node_type,
+      title: node.title,
+      url: node.url,
+      parent_id: node.parent_id,
+      sort_order: node.sort_order,
+      theme_color: node.theme_color ?? null,
+      theme_colors: node.theme_colors ?? null,
+      icon: node.icon ?? null,
+      children: node.children ? canonicalizeTree(node.children) : [],
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
 export function computeTreeHash(nodes: BrowserTreeNode[]): string {
@@ -31,24 +33,6 @@ export function computeTreeHash(nodes: BrowserTreeNode[]): string {
   const hasher = new Bun.CryptoHasher("sha256");
   hasher.update(jsonStr);
   return hasher.digest("hex");
-}
-
-function getProfileLastModified(sourcePath: string, sessionPath?: string, fallback: string = new Date().toISOString()): string {
-  try {
-    let latestMs = 0;
-    if (existsSync(sourcePath)) {
-      latestMs = Math.max(latestMs, statSync(sourcePath).mtimeMs);
-    }
-    if (sessionPath && existsSync(sessionPath)) {
-      latestMs = Math.max(latestMs, statSync(sessionPath).mtimeMs);
-    }
-    if (latestMs > 0) {
-      return new Date(latestMs).toISOString();
-    }
-  } catch {
-    // fallback
-  }
-  return fallback;
 }
 
 export class BrowserSyncManager {
@@ -184,78 +168,101 @@ export class BrowserSyncManager {
   }
 
   public async runSync(): Promise<SyncResult> {
-    const timestamp = new Date().toISOString();
+    const syncTimestamp = new Date().toISOString();
     const profiles = this.getBrowserProfiles();
     let syncedNodesCount = 0;
     const errors: { browser: string; message: string }[] = [];
 
     for (const prof of profiles) {
       try {
-        const browserUpdateTime = getProfileLastModified(prof.sourcePath, prof.sessionPath, timestamp);
+        let nodes: BrowserTreeNode[] = [];
         if (prof.browser === "dia") {
-          const nodes = parseDiaTree({
+          nodes = parseDiaTree({
             userDataPath: prof.sourcePath,
             osType: this.osType,
-            snapshotTime: browserUpdateTime,
+            snapshotTime: syncTimestamp,
           });
-          if (nodes.length > 0) {
-            // Dia's profile databases are merged into one browser-wide tree.
-            // Remove legacy per-profile roots as part of every replacement.
-            this.db.replaceBrowserNodes(prof.browser, nodes);
-            syncedNodesCount += nodes.length;
+        } else {
+          const safeTmpFile = join(this.cacheDir, `${prof.browser}_${prof.profileName.replace(/\s+/g, "_")}_${Date.now()}`);
+          copyFileSync(prof.sourcePath, safeTmpFile);
+
+          if (prof.browser === "arc") {
+            nodes = parseArcSidebar({
+              filePath: safeTmpFile,
+              osType: this.osType,
+              profileName: prof.profileName,
+              snapshotTime: syncTimestamp,
+            });
+          } else if (prof.browser === "chrome") {
+            const safeSessionFile = prof.sessionPath ? `${safeTmpFile}_session` : undefined;
+            if (prof.sessionPath && safeSessionFile) copyFileSync(prof.sessionPath, safeSessionFile);
+            nodes = parseChromePreferences({
+              filePath: safeTmpFile,
+              sessionFilePath: safeSessionFile,
+              osType: this.osType,
+              profileName: prof.profileName,
+              snapshotTime: syncTimestamp,
+            });
+          } else if (prof.browser === "vivaldi") {
+            const safeSessionFile = prof.sessionPath ? `${safeTmpFile}_session` : undefined;
+            if (prof.sessionPath && safeSessionFile) copyFileSync(prof.sessionPath, safeSessionFile);
+            nodes = parseVivaldiPreferences({
+              filePath: safeTmpFile,
+              sessionFilePath: safeSessionFile,
+              osType: this.osType,
+              profileName: prof.profileName,
+              snapshotTime: syncTimestamp,
+            });
+          } else if (prof.browser === "zen") {
+            nodes = parseZenSessionstore({
+              filePath: safeTmpFile,
+              osType: this.osType,
+              profileName: prof.profileName,
+              snapshotTime: syncTimestamp,
+            });
+          } else if (prof.browser === "firefox") {
+            nodes = parseFirefoxSessionstore({
+              filePath: safeTmpFile,
+              osType: this.osType,
+              profileName: prof.profileName,
+              snapshotTime: syncTimestamp,
+            });
           }
-          continue;
-        }
-
-        const safeTmpFile = join(this.cacheDir, `${prof.browser}_${prof.profileName.replace(/\s+/g, "_")}_${Date.now()}`);
-        copyFileSync(prof.sourcePath, safeTmpFile);
-
-        let nodes: BrowserTreeNode[] = [];
-        if (prof.browser === "arc") {
-          nodes = parseArcSidebar({
-            filePath: safeTmpFile,
-            osType: this.osType,
-            profileName: prof.profileName,
-            snapshotTime: browserUpdateTime,
-          });
-        } else if (prof.browser === "chrome") {
-          const safeSessionFile = prof.sessionPath ? `${safeTmpFile}_session` : undefined;
-          if (prof.sessionPath && safeSessionFile) copyFileSync(prof.sessionPath, safeSessionFile);
-          nodes = parseChromePreferences({
-            filePath: safeTmpFile,
-            sessionFilePath: safeSessionFile,
-            osType: this.osType,
-            profileName: prof.profileName,
-            snapshotTime: browserUpdateTime,
-          });
-        } else if (prof.browser === "vivaldi") {
-          const safeSessionFile = prof.sessionPath ? `${safeTmpFile}_session` : undefined;
-          if (prof.sessionPath && safeSessionFile) copyFileSync(prof.sessionPath, safeSessionFile);
-          nodes = parseVivaldiPreferences({
-            filePath: safeTmpFile,
-            sessionFilePath: safeSessionFile,
-            osType: this.osType,
-            profileName: prof.profileName,
-            snapshotTime: browserUpdateTime,
-          });
-        } else if (prof.browser === "zen") {
-          nodes = parseZenSessionstore({
-            filePath: safeTmpFile,
-            osType: this.osType,
-            profileName: prof.profileName,
-            snapshotTime: browserUpdateTime,
-          });
-        } else if (prof.browser === "firefox") {
-          nodes = parseFirefoxSessionstore({
-            filePath: safeTmpFile,
-            osType: this.osType,
-            profileName: prof.profileName,
-            snapshotTime: browserUpdateTime,
-          });
         }
 
         if (nodes.length > 0) {
-          this.db.replaceProfileNodes(prof.browser, prof.profileName, nodes);
+          // Compare with existing DB nodes for this browser/profile to detect valid changes
+          const existingNodes = prof.browser === "dia"
+            ? this.db.getAllNodes(prof.browser)
+            : this.db.getAllNodes(prof.browser, prof.profileName);
+
+          let resolvedLastUpdateTime = syncTimestamp;
+          if (existingNodes.length > 0) {
+            const existingHash = computeTreeHash(existingNodes);
+            const currentHash = computeTreeHash(nodes);
+
+            if (existingHash === currentHash) {
+              // No valid structural/content changes (created, deleted, renamed, reordered, url changed).
+              // Retain previous lastUpdateTime.
+              resolvedLastUpdateTime = existingNodes[0].lastUpdateTime || existingNodes[0].snapshot_time || syncTimestamp;
+            } else {
+              // Valid changes detected: update lastUpdateTime to now
+              resolvedLastUpdateTime = syncTimestamp;
+            }
+          }
+
+          // Apply resolved lastUpdateTime to all nodes
+          for (const node of nodes) {
+            node.lastUpdateTime = resolvedLastUpdateTime;
+          }
+
+          if (prof.browser === "dia") {
+            // Dia's profile databases are merged into one browser-wide tree.
+            // Remove legacy per-profile roots as part of every replacement.
+            this.db.replaceBrowserNodes(prof.browser, nodes);
+          } else {
+            this.db.replaceProfileNodes(prof.browser, prof.profileName, nodes);
+          }
           syncedNodesCount += nodes.length;
         }
       } catch (err: any) {
@@ -284,7 +291,7 @@ export class BrowserSyncManager {
     return {
       success: errors.length === 0,
       syncedNodesCount,
-      timestamp,
+      timestamp: syncTimestamp,
       errors: errors.length > 0 ? errors : undefined,
     };
   }

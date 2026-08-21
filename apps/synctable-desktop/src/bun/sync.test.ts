@@ -181,4 +181,158 @@ describe("BrowserSyncManager Raindrop Sync", () => {
     expect(stats.detectedBrowsers[0].name).toBe("zen");
     expect(stats.detectedBrowsers[1].name).toBe("chrome");
   });
+
+  test("only updates lastUpdateTime when there are actual valid changes", async () => {
+    const db = new SyncTableDB(":memory:");
+    const manager = new BrowserSyncManager(db, new KeychainService("mock"), new RaindropClient());
+
+    // Initial state: Arc has 1 tab
+    const initialArcNodes: BrowserTreeNode[] = [
+      {
+        id: "arc-root",
+        browser_name: "arc",
+        os_type: "macos",
+        profile_name: "Default",
+        node_type: "root",
+        title: "Arc",
+        url: null,
+        parent_id: null,
+        sort_order: 0,
+        snapshot_time: "2026-08-21T10:00:00.000Z",
+        lastUpdateTime: "2026-08-21T10:00:00.000Z",
+      },
+      {
+        id: "arc-tab-1",
+        browser_name: "arc",
+        os_type: "macos",
+        profile_name: "Default",
+        node_type: "tab",
+        title: "GitHub",
+        url: "https://github.com",
+        parent_id: "arc-root",
+        sort_order: 0,
+        snapshot_time: "2026-08-21T10:00:00.000Z",
+        lastUpdateTime: "2026-08-21T10:00:00.000Z",
+      },
+    ];
+    db.replaceProfileNodes("arc", "Default", initialArcNodes);
+
+    // Verify existing node hash
+    const initialHash = computeTreeHash(initialArcNodes);
+    expect(initialHash).toBeDefined();
+
+    // Mock unchanged sync: identical nodes
+    const identicalNodes: BrowserTreeNode[] = [
+      {
+        id: "arc-root",
+        browser_name: "arc",
+        os_type: "macos",
+        profile_name: "Default",
+        node_type: "root",
+        title: "Arc",
+        url: null,
+        parent_id: null,
+        sort_order: 0,
+        snapshot_time: "2026-08-21T11:00:00.000Z",
+      },
+      {
+        id: "arc-tab-1",
+        browser_name: "arc",
+        os_type: "macos",
+        profile_name: "Default",
+        node_type: "tab",
+        title: "GitHub",
+        url: "https://github.com",
+        parent_id: "arc-root",
+        sort_order: 0,
+        snapshot_time: "2026-08-21T11:00:00.000Z",
+      },
+    ];
+
+    // Comparing hashes: identical
+    expect(computeTreeHash(identicalNodes)).toBe(initialHash);
+
+    // When valid change occurs: tab URL changed
+    const urlChangedNodes: BrowserTreeNode[] = [
+      {
+        id: "arc-root",
+        browser_name: "arc",
+        os_type: "macos",
+        profile_name: "Default",
+        node_type: "root",
+        title: "Arc",
+        url: null,
+        parent_id: null,
+        sort_order: 0,
+        snapshot_time: "2026-08-21T12:00:00.000Z",
+      },
+      {
+        id: "arc-tab-1",
+        browser_name: "arc",
+        os_type: "macos",
+        profile_name: "Default",
+        node_type: "tab",
+        title: "GitHub",
+        url: "https://github.com/oscarqht/synctable", // URL changed
+        parent_id: "arc-root",
+        sort_order: 0,
+        snapshot_time: "2026-08-21T12:00:00.000Z",
+      },
+    ];
+    expect(computeTreeHash(urlChangedNodes)).not.toBe(initialHash);
+
+    // When valid change occurs: tab renamed
+    const titleChangedNodes: BrowserTreeNode[] = [
+      {
+        id: "arc-root",
+        browser_name: "arc",
+        os_type: "macos",
+        profile_name: "Default",
+        node_type: "root",
+        title: "Arc",
+        url: null,
+        parent_id: null,
+        sort_order: 0,
+        snapshot_time: "2026-08-21T12:00:00.000Z",
+      },
+      {
+        id: "arc-tab-1",
+        browser_name: "arc",
+        os_type: "macos",
+        profile_name: "Default",
+        node_type: "tab",
+        title: "GitHub - SyncTable Repo", // Title changed
+        url: "https://github.com",
+        parent_id: "arc-root",
+        sort_order: 0,
+        snapshot_time: "2026-08-21T12:00:00.000Z",
+      },
+    ];
+    expect(computeTreeHash(titleChangedNodes)).not.toBe(initialHash);
+
+    // When valid change occurs: tab created
+    const tabCreatedNodes: BrowserTreeNode[] = [
+      ...initialArcNodes,
+      {
+        id: "arc-tab-2",
+        browser_name: "arc",
+        os_type: "macos",
+        profile_name: "Default",
+        node_type: "tab",
+        title: "Google",
+        url: "https://google.com",
+        parent_id: "arc-root",
+        sort_order: 1,
+        snapshot_time: "2026-08-21T12:00:00.000Z",
+      },
+    ];
+    expect(computeTreeHash(tabCreatedNodes)).not.toBe(initialHash);
+
+    // When valid change occurs: tab order changed
+    const orderChangedNodes: BrowserTreeNode[] = [
+      { ...initialArcNodes[0] },
+      { ...initialArcNodes[1], sort_order: 5 },
+    ];
+    expect(computeTreeHash(orderChangedNodes)).not.toBe(initialHash);
+  });
 });
