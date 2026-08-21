@@ -254,7 +254,14 @@ export function parseArcSidebar(options: ArcParserOptions): BrowserTreeNode[] {
   const rootId = `arc-${osType}-${arcId(profileName, "default")}-root`;
   const windowId = `arc-${arcId(profileName, "default")}-win-default`;
   const addNode = (node: Omit<BrowserTreeNode, "browser_name" | "os_type" | "profile_name" | "snapshot_time">) =>
-    nodes.push({ ...node, browser_name: "arc", os_type: osType, profile_name: profileName, snapshot_time: snapshotTime });
+    nodes.push({
+      ...node,
+      browser_name: "arc",
+      os_type: osType,
+      profile_name: profileName,
+      snapshot_time: snapshotTime,
+      lastUpdateTime: snapshotTime,
+    });
 
   addNode({ id: rootId, node_type: "root", title: "Arc Browser", url: null, parent_id: null, sort_order: 0 });
   addNode({ id: windowId, node_type: "window", title: "Main Window", url: null, parent_id: rootId, sort_order: 0 });

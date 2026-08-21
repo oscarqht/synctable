@@ -45,13 +45,13 @@ export function parseFirefoxSessionData(data: any, options: Omit<FirefoxParserOp
   const profileId = encodeURIComponent(profileName);
   const nodes: BrowserTreeNode[] = [];
   const rootId = `firefox-${osType}-${profileId}-root`;
-  nodes.push({ id: rootId, browser_name: "firefox", os_type: osType, profile_name: profileName, node_type: "root", title: `Firefox (${profileName})`, url: null, parent_id: null, sort_order: 0, snapshot_time: snapshotTime });
+  nodes.push({ id: rootId, browser_name: "firefox", os_type: osType, profile_name: profileName, node_type: "root", title: `Firefox (${profileName})`, url: null, parent_id: null, sort_order: 0, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
 
   (Array.isArray(data?.windows) ? data.windows : []).forEach((window: any, windowIndex: number) => {
     const windowId = `firefox-${profileId}-win-${windowIndex}`;
     const workspaceId = `${windowId}-ws-default`;
-    nodes.push({ id: windowId, browser_name: "firefox", os_type: osType, profile_name: profileName, node_type: "window", title: `Firefox Window ${windowIndex + 1}`, url: null, parent_id: rootId, sort_order: windowIndex, snapshot_time: snapshotTime });
-    nodes.push({ id: workspaceId, browser_name: "firefox", os_type: osType, profile_name: profileName, node_type: "workspace", title: "Default Workspace", url: null, parent_id: windowId, sort_order: 0, snapshot_time: snapshotTime });
+    nodes.push({ id: windowId, browser_name: "firefox", os_type: osType, profile_name: profileName, node_type: "window", title: `Firefox Window ${windowIndex + 1}`, url: null, parent_id: rootId, sort_order: windowIndex, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
+    nodes.push({ id: workspaceId, browser_name: "firefox", os_type: osType, profile_name: profileName, node_type: "workspace", title: "Default Workspace", url: null, parent_id: windowId, sort_order: 0, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
 
     const tabs: any[] = Array.isArray(window?.tabs) ? window.tabs : [];
     // Firefox's session format has used both `groupId` and `tabGroupId`; accept
@@ -80,7 +80,7 @@ export function parseFirefoxSessionData(data: any, options: Omit<FirefoxParserOp
       nodes.push({
         id: groupNodeId(groupId), browser_name: "firefox", os_type: osType, profile_name: profileName, node_type: "folder",
         title: group?.title || group?.name || group?.label || "Tab Group", url: null, parent_id: workspaceId,
-        sort_order: firstTabIndex((tab) => String(groupIdFor(tab)) === groupId), snapshot_time: snapshotTime,
+        sort_order: firstTabIndex((tab) => String(groupIdFor(tab)) === groupId), snapshot_time: snapshotTime, lastUpdateTime: snapshotTime,
       });
     });
 
@@ -108,7 +108,7 @@ export function parseFirefoxSessionData(data: any, options: Omit<FirefoxParserOp
       nodes.push({
         id: splitNodeId(splitId), browser_name: "firefox", os_type: osType, profile_name: profileName, node_type: "split_view",
         title: "Split View", url: null, parent_id: splitParentId(splitId),
-        sort_order: firstTabIndex((tab) => String(splitIdFor(tab)) === splitId), snapshot_time: snapshotTime,
+        sort_order: firstTabIndex((tab) => String(splitIdFor(tab)) === splitId), snapshot_time: snapshotTime, lastUpdateTime: snapshotTime,
       });
     });
 
@@ -125,7 +125,7 @@ export function parseFirefoxSessionData(data: any, options: Omit<FirefoxParserOp
       nodes.push({
         id: `${windowId}-tab-${tab?.permanentKey || tab?.tabId || tabIndex}`, browser_name: "firefox", os_type: osType, profile_name: profileName,
         node_type: tab?.pinned ? "pinned_tab" : "tab", title: tabTitle(tab, tabIndex), url, parent_id: parentId,
-        sort_order: tabIndex, snapshot_time: snapshotTime,
+        sort_order: tabIndex, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime,
       });
     });
   });

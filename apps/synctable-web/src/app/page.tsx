@@ -209,18 +209,32 @@ export default function Home() {
       .filter((dev) => dev.tree.length > 0);
   }, [syncData]);
 
-  // Collect all unique browsers across non-empty devices
+  // Collect all unique browsers across non-empty devices, sorted by lastUpdateTime DESC
   const availableBrowsers = useMemo(() => {
     if (!validDevices.length) return [];
-    const set = new Set<string>();
+    const browserTimeMap = new Map<string, string>();
     for (const dev of validDevices) {
       for (const node of dev.tree) {
         if (node.browser_name && countTabs(node) > 0) {
-          set.add(node.browser_name.toLowerCase());
+          const b = node.browser_name.toLowerCase();
+          const time = node.lastUpdateTime || node.snapshot_time || "";
+          const existing = browserTimeMap.get(b) || "";
+          if (time > existing) {
+            browserTimeMap.set(b, time);
+          }
         }
       }
     }
-    return Array.from(set).sort();
+    return Array.from(browserTimeMap.keys()).sort((a, b) => {
+      const timeA = browserTimeMap.get(a) || "";
+      const timeB = browserTimeMap.get(b) || "";
+      if (timeA && timeB) {
+        return timeB.localeCompare(timeA);
+      }
+      if (timeA) return -1;
+      if (timeB) return 1;
+      return a.localeCompare(b);
+    });
   }, [validDevices]);
 
   // Aggregate stats across non-empty devices

@@ -52,15 +52,18 @@ export function DeviceCard({
     return filteredRoots.reduce((acc, r) => acc + countWorkspaces(r), 0);
   }, [filteredRoots]);
 
-  const deviceBrowsers = useMemo(() => {
-    return Array.from(
-      new Set(
-        filteredRoots
-          .map((b) => b.browser_name?.toLowerCase())
-          .filter((b): b is string => Boolean(b))
-      )
-    ).sort();
-  }, [filteredRoots]);
+  const getBrowserLastUpdateTime = (nodes: BrowserTreeNode[]): string => {
+    let latest = "";
+    const walk = (node: BrowserTreeNode) => {
+      const time = node.lastUpdateTime || node.snapshot_time || "";
+      if (time > latest) latest = time;
+      if (node.children) {
+        node.children.forEach(walk);
+      }
+    };
+    nodes.forEach(walk);
+    return latest;
+  };
 
   const browserGroups = useMemo(() => {
     const map = new Map<string, BrowserTreeNode[]>();
@@ -71,7 +74,41 @@ export function DeviceCard({
       }
       map.get(bName)!.push(root);
     }
-    return Array.from(map.entries());
+    const entries = Array.from(map.entries());
+    return entries.sort(([nameA, treesA], [nameB, treesB]) => {
+      const timeA = getBrowserLastUpdateTime(treesA);
+      const timeB = getBrowserLastUpdateTime(treesB);
+      if (timeA && timeB) {
+        return timeB.localeCompare(timeA);
+      }
+      if (timeA) return -1;
+      if (timeB) return 1;
+      return nameA.localeCompare(nameB);
+    });
+  }, [filteredRoots]);
+
+  const deviceBrowsers = useMemo(() => {
+    const browserTimeMap = new Map<string, string>();
+    for (const root of filteredRoots) {
+      const bName = (root.browser_name || "").toLowerCase();
+      if (bName) {
+        const time = root.lastUpdateTime || root.snapshot_time || "";
+        const existing = browserTimeMap.get(bName) || "";
+        if (time > existing) {
+          browserTimeMap.set(bName, time);
+        }
+      }
+    }
+    return Array.from(browserTimeMap.keys()).sort((a, b) => {
+      const timeA = browserTimeMap.get(a) || "";
+      const timeB = browserTimeMap.get(b) || "";
+      if (timeA && timeB) {
+        return timeB.localeCompare(timeA);
+      }
+      if (timeA) return -1;
+      if (timeB) return 1;
+      return a.localeCompare(b);
+    });
   }, [filteredRoots]);
 
   const resolvedEmptyMessage =
@@ -128,17 +165,25 @@ export function DeviceCard({
             {browserGroups.map(([browserName, browserTrees]) => {
               const workspaces = browserTrees.flatMap(extractWorkspacesFromRoot);
               if (workspaces.length === 0) return null;
+              const browserLastUpdateTime = getBrowserLastUpdateTime(browserTrees);
 
               return (
                 <div key={browserName} className="space-y-3">
-                  <div className="flex items-center gap-2 px-1">
-                    <span className="text-xs uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
-                      {browserName}
-                    </span>
-                    <span className="text-[11px] font-medium text-slate-400">
-                      ({workspaces.length}{" "}
-                      {workspaces.length === 1 ? "workspace" : "workspaces"})
-                    </span>
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
+                        {browserName}
+                      </span>
+                      <span className="text-[11px] font-medium text-slate-400">
+                        ({workspaces.length}{" "}
+                        {workspaces.length === 1 ? "workspace" : "workspaces"})
+                      </span>
+                    </div>
+                    {browserLastUpdateTime && (
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Updated {formatRelativeTime(browserLastUpdateTime)}
+                      </span>
+                    )}
                   </div>
                   {/* Arrange each workspace as a separate card in the grid */}
                   <div

@@ -389,5 +389,6 @@ function treeNode(
     parent_id: parentId,
     sort_order: sortOrder,
     snapshot_time: options.snapshotTime,
+    lastUpdateTime: options.snapshotTime,
   };
 }

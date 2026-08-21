@@ -95,5 +95,70 @@ describe("SyncTableDB", () => {
     expect(tree[0].theme_colors).toEqual(["#8ef1cc", "#95dff1", "#99f09e"]);
     expect(tree[0].icon).toBe("🐻");
   });
+
+  test("persists lastUpdateTime and sorts getTree root nodes by lastUpdateTime DESC", () => {
+    const db = new SyncTableDB(":memory:");
+
+    const olderChromeNode: BrowserTreeNode = {
+      id: "chrome-root",
+      browser_name: "chrome",
+      os_type: "macos",
+      profile_name: "Default",
+      node_type: "root",
+      title: "Chrome",
+      url: null,
+      parent_id: null,
+      sort_order: 0,
+      snapshot_time: "2026-08-21T10:00:00.000Z",
+      lastUpdateTime: "2026-08-21T10:00:00.000Z",
+    };
+
+    const newerZenNode: BrowserTreeNode = {
+      id: "zen-root",
+      browser_name: "zen",
+      os_type: "macos",
+      profile_name: "Default",
+      node_type: "root",
+      title: "Zen",
+      url: null,
+      parent_id: null,
+      sort_order: 0,
+      snapshot_time: "2026-08-21T12:00:00.000Z",
+      lastUpdateTime: "2026-08-21T12:00:00.000Z",
+    };
+
+    const newestArcNode: BrowserTreeNode = {
+      id: "arc-root",
+      browser_name: "arc",
+      os_type: "macos",
+      profile_name: "Default",
+      node_type: "root",
+      title: "Arc",
+      url: null,
+      parent_id: null,
+      sort_order: 0,
+      snapshot_time: "2026-08-21T14:00:00.000Z",
+      lastUpdateTime: "2026-08-21T14:00:00.000Z",
+    };
+
+    db.upsertNodes([olderChromeNode, newestArcNode, newerZenNode]);
+
+    const allNodes = db.getAllNodes();
+    expect(allNodes).toHaveLength(3);
+    const chromeFound = allNodes.find((n) => n.id === "chrome-root");
+    expect(chromeFound?.lastUpdateTime).toBe("2026-08-21T10:00:00.000Z");
+
+    const tree = db.getTree();
+    expect(tree).toHaveLength(3);
+    // Tree roots should be sorted DESC by lastUpdateTime: Arc (14:00), Zen (12:00), Chrome (10:00)
+    expect(tree.map((n) => n.id)).toEqual(["arc-root", "zen-root", "chrome-root"]);
+
+    const lastUpdates = db.getBrowserLastUpdateTimes();
+    expect(lastUpdates).toEqual({
+      chrome: "2026-08-21T10:00:00.000Z",
+      zen: "2026-08-21T12:00:00.000Z",
+      arc: "2026-08-21T14:00:00.000Z",
+    });
+  });
 });
 

@@ -128,4 +128,57 @@ describe("BrowserSyncManager Raindrop Sync", () => {
     expect(res.errors).toEqual([{ browser: "raindrop", message: "Unauthorized (401)" }]);
     expect(db.getLastUploadedTreeHash()).toBeNull();
   });
+
+  test("getStatsWithDetected returns lastUpdateTime and sorts detected browsers DESC", () => {
+    const db = new SyncTableDB(":memory:");
+    db.upsertNodes([
+      {
+        id: "chrome-t1",
+        browser_name: "chrome",
+        os_type: "macos",
+        profile_name: "Default",
+        node_type: "tab",
+        title: "Chrome Tab",
+        url: "https://chrome.com",
+        parent_id: null,
+        sort_order: 0,
+        snapshot_time: "2026-08-21T08:00:00.000Z",
+        lastUpdateTime: "2026-08-21T08:00:00.000Z",
+      },
+      {
+        id: "zen-t1",
+        browser_name: "zen",
+        os_type: "macos",
+        profile_name: "Default",
+        node_type: "tab",
+        title: "Zen Tab",
+        url: "https://zen.com",
+        parent_id: null,
+        sort_order: 0,
+        snapshot_time: "2026-08-21T16:00:00.000Z",
+        lastUpdateTime: "2026-08-21T16:00:00.000Z",
+      },
+    ]);
+
+    const manager = new BrowserSyncManager(db, new KeychainService("mock"), new RaindropClient());
+    manager.getBrowserProfiles = () => [
+      { browser: "chrome", displayName: "Google Chrome", profileName: "Default", sourcePath: "/mock/chrome" },
+      { browser: "zen", displayName: "Zen Browser", profileName: "Default", sourcePath: "/mock/zen" },
+      { browser: "firefox", displayName: "Firefox", profileName: "Default", sourcePath: "/mock/firefox" },
+    ];
+
+    const stats = manager.getStatsWithDetected();
+    expect(stats.detectedBrowsers).toBeDefined();
+    // Zen (16:00) should be before Chrome (08:00), followed by detected without timestamp (Firefox)
+    const zen = stats.detectedBrowsers.find((b) => b.name === "zen");
+    expect(zen?.lastUpdateTime).toBe("2026-08-21T16:00:00.000Z");
+    expect(zen?.detected).toBe(true);
+
+    const chrome = stats.detectedBrowsers.find((b) => b.name === "chrome");
+    expect(chrome?.lastUpdateTime).toBe("2026-08-21T08:00:00.000Z");
+    expect(chrome?.detected).toBe(true);
+
+    expect(stats.detectedBrowsers[0].name).toBe("zen");
+    expect(stats.detectedBrowsers[1].name).toBe("chrome");
+  });
 });

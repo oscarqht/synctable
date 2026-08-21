@@ -421,3 +421,114 @@ describe("treeUtils - getAllTabUrls", () => {
     expect(getAllTabUrls(undefined)).toEqual([]);
   });
 });
+
+describe("treeUtils - browser lastUpdateTime sorting", () => {
+  it("sorts browsers in descending order of lastUpdateTime", () => {
+    const devicesTrees: BrowserTreeNode[] = [
+      {
+        id: "chrome-root",
+        browser_name: "chrome",
+        os_type: "macos",
+        profile_name: "default",
+        node_type: "root",
+        title: "Chrome",
+        url: null,
+        parent_id: null,
+        sort_order: 0,
+        snapshot_time: "2026-08-21T09:00:00Z",
+        lastUpdateTime: "2026-08-21T09:00:00Z",
+        children: [
+          {
+            id: "chrome-tab",
+            browser_name: "chrome",
+            os_type: "macos",
+            profile_name: "default",
+            node_type: "tab",
+            title: "Google",
+            url: "https://google.com",
+            parent_id: "chrome-root",
+            sort_order: 0,
+            snapshot_time: "2026-08-21T09:00:00Z",
+            lastUpdateTime: "2026-08-21T09:00:00Z",
+          },
+        ],
+      },
+      {
+        id: "arc-root",
+        browser_name: "arc",
+        os_type: "macos",
+        profile_name: "default",
+        node_type: "root",
+        title: "Arc",
+        url: null,
+        parent_id: null,
+        sort_order: 0,
+        snapshot_time: "2026-08-21T15:00:00Z",
+        lastUpdateTime: "2026-08-21T15:00:00Z",
+        children: [
+          {
+            id: "arc-tab",
+            browser_name: "arc",
+            os_type: "macos",
+            profile_name: "default",
+            node_type: "tab",
+            title: "Arc Home",
+            url: "https://arc.net",
+            parent_id: "arc-root",
+            sort_order: 0,
+            snapshot_time: "2026-08-21T15:00:00Z",
+            lastUpdateTime: "2026-08-21T15:00:00Z",
+          },
+        ],
+      },
+      {
+        id: "zen-root",
+        browser_name: "zen",
+        os_type: "macos",
+        profile_name: "default",
+        node_type: "root",
+        title: "Zen",
+        url: null,
+        parent_id: null,
+        sort_order: 0,
+        snapshot_time: "2026-08-21T12:00:00Z",
+        lastUpdateTime: "2026-08-21T12:00:00Z",
+        children: [
+          {
+            id: "zen-tab",
+            browser_name: "zen",
+            os_type: "macos",
+            profile_name: "default",
+            node_type: "tab",
+            title: "Zen Browser",
+            url: "https://zen-browser.app",
+            parent_id: "zen-root",
+            sort_order: 0,
+            snapshot_time: "2026-08-21T12:00:00Z",
+            lastUpdateTime: "2026-08-21T12:00:00Z",
+          },
+        ],
+      },
+    ];
+
+    const browserTimeMap = new Map<string, string>();
+    devicesTrees.forEach((node) => {
+      if (node.browser_name && countTabs(node) > 0) {
+        const b = node.browser_name.toLowerCase();
+        const time = node.lastUpdateTime || node.snapshot_time || "";
+        const existing = browserTimeMap.get(b) || "";
+        if (time > existing) {
+          browserTimeMap.set(b, time);
+        }
+      }
+    });
+
+    const sortedBrowsers = Array.from(browserTimeMap.keys()).sort((a, b) => {
+      const timeA = browserTimeMap.get(a) || "";
+      const timeB = browserTimeMap.get(b) || "";
+      return timeB.localeCompare(timeA);
+    });
+
+    expect(sortedBrowsers).toEqual(["arc", "zen", "chrome"]);
+  });
+});

@@ -55,17 +55,31 @@ export function MultiDeviceCardsPortal({
     });
   }, [data]);
 
-  // Compute available browsers across all valid devices
+  // Compute available browsers across all valid devices, sorted by lastUpdateTime DESC
   const availableBrowsers = useMemo(() => {
-    const set = new Set<string>();
+    const browserTimeMap = new Map<string, string>();
     validDevices.forEach((dev) => {
       dev.tree.forEach((node) => {
         if (node.browser_name && countTabs(node) > 0) {
-          set.add(node.browser_name.toLowerCase());
+          const b = node.browser_name.toLowerCase();
+          const time = node.lastUpdateTime || node.snapshot_time || "";
+          const existing = browserTimeMap.get(b) || "";
+          if (time > existing) {
+            browserTimeMap.set(b, time);
+          }
         }
       });
     });
-    return Array.from(set).sort();
+    return Array.from(browserTimeMap.keys()).sort((a, b) => {
+      const timeA = browserTimeMap.get(a) || "";
+      const timeB = browserTimeMap.get(b) || "";
+      if (timeA && timeB) {
+        return timeB.localeCompare(timeA);
+      }
+      if (timeA) return -1;
+      if (timeB) return 1;
+      return a.localeCompare(b);
+    });
   }, [validDevices]);
 
   // Filter visible devices based on device selection

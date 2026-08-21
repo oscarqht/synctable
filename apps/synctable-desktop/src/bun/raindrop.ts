@@ -80,11 +80,24 @@ export function ensureTreeHierarchy(nodes: any[]): BrowserTreeNode[] {
     return [];
   }
 
+  const sortRoots = (roots: BrowserTreeNode[]): BrowserTreeNode[] => {
+    return roots.sort((a, b) => {
+      const timeA = a.lastUpdateTime || a.snapshot_time || "";
+      const timeB = b.lastUpdateTime || b.snapshot_time || "";
+      if (timeA && timeB) {
+        return timeB.localeCompare(timeA);
+      }
+      if (timeA) return -1;
+      if (timeB) return 1;
+      return a.sort_order - b.sort_order;
+    });
+  };
+
   const hasChildrenField = nodes.some(
     (n) => n.children && Array.isArray(n.children) && n.children.length > 0
   );
   if (hasChildrenField) {
-    return nodes as BrowserTreeNode[];
+    return sortRoots(nodes as BrowserTreeNode[]);
   }
 
   const nodeMap = new Map<string, BrowserTreeNode>();
@@ -92,7 +105,11 @@ export function ensureTreeHierarchy(nodes: any[]): BrowserTreeNode[] {
 
   for (const node of nodes) {
     if (node && node.id) {
-      nodeMap.set(String(node.id), { ...node, children: [] });
+      nodeMap.set(String(node.id), {
+        ...node,
+        lastUpdateTime: node.lastUpdateTime || node.snapshot_time,
+        children: [],
+      });
     }
   }
 
@@ -108,7 +125,7 @@ export function ensureTreeHierarchy(nodes: any[]): BrowserTreeNode[] {
     }
   }
 
-  return rootNodes.length > 0 ? rootNodes : (nodes as BrowserTreeNode[]);
+  return rootNodes.length > 0 ? sortRoots(rootNodes) : sortRoots(nodes as BrowserTreeNode[]);
 }
 
 export class RaindropClient {

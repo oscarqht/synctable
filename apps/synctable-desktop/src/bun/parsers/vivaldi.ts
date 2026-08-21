@@ -131,7 +131,7 @@ export function parseVivaldiPreferences(options: VivaldiParserOptions): BrowserT
   const nodes: BrowserTreeNode[] = [];
   const rootId = `vivaldi-${osType}-${profileName}-root`;
   const session = parseSessionSnapshot(sessionFilePath);
-  nodes.push({ id: rootId, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "root", title: `Vivaldi (${profileName})`, url: null, parent_id: null, sort_order: 0, snapshot_time: snapshotTime });
+  nodes.push({ id: rootId, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "root", title: `Vivaldi (${profileName})`, url: null, parent_id: null, sort_order: 0, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
 
   const workspaceItems = Array.isArray(data?.vivaldi?.workspaces?.list) ? data.vivaldi.workspaces.list : [];
   const workspaces: { id: string; title: string }[] = workspaceItems.length > 0
@@ -142,7 +142,7 @@ export function parseVivaldiPreferences(options: VivaldiParserOptions): BrowserT
 
   windowIds.forEach((sourceWindowId, windowIndex) => {
     const windowId = `vivaldi-${profileName}-win-${sourceWindowId}`;
-    nodes.push({ id: windowId, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "window", title: `Vivaldi Window ${windowIndex + 1}`, url: null, parent_id: rootId, sort_order: windowIndex, snapshot_time: snapshotTime });
+    nodes.push({ id: windowId, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "window", title: `Vivaldi Window ${windowIndex + 1}`, url: null, parent_id: rootId, sort_order: windowIndex, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
     const windowTabs = session.tabs.filter((item) => item.windowId === sourceWindowId);
     const knownWorkspaceIds = new Set(workspaces.map((workspace) => workspace.id));
     const needsDefaultWorkspace = workspaceItems.length > 0
@@ -153,11 +153,11 @@ export function parseVivaldiPreferences(options: VivaldiParserOptions): BrowserT
       : defaultWorkspaceId;
 
     if (needsDefaultWorkspace) {
-      nodes.push({ id: defaultWorkspaceId, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "workspace", title: "Main Workspace", url: null, parent_id: windowId, sort_order: 0, snapshot_time: snapshotTime });
+      nodes.push({ id: defaultWorkspaceId, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "workspace", title: "Main Workspace", url: null, parent_id: windowId, sort_order: 0, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
     }
     workspaces.forEach((workspace: { id: string; title: string }, workspaceIndex: number) => {
       const workspaceId = `vivaldi-${profileName}-win-${sourceWindowId}-ws-${workspace.id}`;
-      nodes.push({ id: workspaceId, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "workspace", title: workspace.title, url: null, parent_id: windowId, sort_order: workspaceIndex + (needsDefaultWorkspace ? 1 : 0), snapshot_time: snapshotTime });
+      nodes.push({ id: workspaceId, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "workspace", title: workspace.title, url: null, parent_id: windowId, sort_order: workspaceIndex + (needsDefaultWorkspace ? 1 : 0), snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
     });
     const windowGroupIds = new Set(windowTabs.filter((item) => item.groupId).map((item) => item.groupId!));
     const groups = session.groups
@@ -167,7 +167,7 @@ export function parseVivaldiPreferences(options: VivaldiParserOptions): BrowserT
         return { group, workspaceId: workspaceNodeId(groupTabs[0]?.workspaceId), firstTabIndex: Math.min(...groupTabs.map((item) => item.index)) };
       });
     const groupNodeId = (groupId: string) => `vivaldi-${profileName}-win-${sourceWindowId}-group-${groupId}`;
-    groups.forEach(({ group, workspaceId, firstTabIndex }) => nodes.push({ id: groupNodeId(group.id), browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "folder", title: group.title, url: null, parent_id: workspaceId, sort_order: firstTabIndex, snapshot_time: snapshotTime }));
+    groups.forEach(({ group, workspaceId, firstTabIndex }) => nodes.push({ id: groupNodeId(group.id), browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "folder", title: group.title, url: null, parent_id: workspaceId, sort_order: firstTabIndex, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime }));
     const windowSplitIds = new Set(windowTabs.flatMap((item) => item.tiling ? [item.tiling.id] : []));
     const splits = [...windowSplitIds].map((splitId) => {
       const splitTabs = windowTabs.filter((item) => item.tiling?.id === splitId);
@@ -181,7 +181,7 @@ export function parseVivaldiPreferences(options: VivaldiParserOptions): BrowserT
       };
     });
     const splitNodeId = (splitId: string) => `vivaldi-${profileName}-win-${sourceWindowId}-split-${splitId}`;
-    splits.forEach((split) => nodes.push({ id: splitNodeId(split.id), browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "split_view", title: "Split View", url: null, parent_id: split.parentId, sort_order: split.firstTabIndex, snapshot_time: snapshotTime }));
+    splits.forEach((split) => nodes.push({ id: splitNodeId(split.id), browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: "split_view", title: "Split View", url: null, parent_id: split.parentId, sort_order: split.firstTabIndex, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime }));
     windowTabs.sort((left, right) => left.index - right.index || left.id - right.id).forEach((item) => {
       // A tiled set can be nested inside one tab stack. Tabs remain direct
       // children of the split view rather than being duplicated in the stack.
@@ -190,7 +190,7 @@ export function parseVivaldiPreferences(options: VivaldiParserOptions): BrowserT
         : item.groupId && windowGroupIds.has(item.groupId)
           ? groupNodeId(item.groupId)
           : workspaceNodeId(item.workspaceId);
-      nodes.push({ id: `vivaldi-${profileName}-tab-${item.id}`, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: item.pinned ? "pinned_tab" : "tab", title: item.title || tabTitle(item.url!), url: item.url!, parent_id: parentId, sort_order: item.tiling?.index ?? item.index, snapshot_time: snapshotTime });
+      nodes.push({ id: `vivaldi-${profileName}-tab-${item.id}`, browser_name: "vivaldi", os_type: osType, profile_name: profileName, node_type: item.pinned ? "pinned_tab" : "tab", title: item.title || tabTitle(item.url!), url: item.url!, parent_id: parentId, sort_order: item.tiling?.index ?? item.index, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
     });
   });
   return nodes;

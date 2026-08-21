@@ -129,6 +129,7 @@ export function parseChromePreferences(options: ChromeParserOptions): BrowserTre
     parent_id: null,
     sort_order: 0,
     snapshot_time: snapshotTime,
+    lastUpdateTime: snapshotTime,
   });
 
   const session = parseSessionSnapshot(sessionFilePath);
@@ -139,8 +140,8 @@ export function parseChromePreferences(options: ChromeParserOptions): BrowserTre
   windowIds.forEach((sourceWindowId, windowIndex) => {
     const windowId = `chrome-${profileName}-win-${sourceWindowId}`;
     const workspaceId = `chrome-${profileName}-win-${sourceWindowId}-ws-default`;
-    nodes.push({ id: windowId, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "window", title: `Chrome Window ${windowIndex + 1}`, url: null, parent_id: rootId, sort_order: windowIndex, snapshot_time: snapshotTime });
-    nodes.push({ id: workspaceId, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "workspace", title: "Default Workspace", url: null, parent_id: windowId, sort_order: 0, snapshot_time: snapshotTime });
+    nodes.push({ id: windowId, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "window", title: `Chrome Window ${windowIndex + 1}`, url: null, parent_id: rootId, sort_order: windowIndex, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
+    nodes.push({ id: workspaceId, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "workspace", title: "Default Workspace", url: null, parent_id: windowId, sort_order: 0, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
 
     const windowTabs = session.tabs.filter((item) => item.windowId === sourceWindowId);
     const groupIds = new Set(windowTabs.flatMap((item) => item.groupId ? [item.groupId] : []));
@@ -148,7 +149,7 @@ export function parseChromePreferences(options: ChromeParserOptions): BrowserTre
       const group = session.groups.find((item) => item.id === groupId);
       const title = preferenceGroups.get(groupId) || group?.title || "Tab Group";
       const firstTabIndex = Math.min(...windowTabs.filter((item) => item.groupId === groupId).map((item) => item.index));
-      nodes.push({ id: `chrome-${profileName}-group-${groupId}`, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "folder", title, url: null, parent_id: workspaceId, sort_order: firstTabIndex, snapshot_time: snapshotTime });
+      nodes.push({ id: `chrome-${profileName}-group-${groupId}`, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "folder", title, url: null, parent_id: workspaceId, sort_order: firstTabIndex, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
     }
 
     const splitIds = new Set(windowTabs.flatMap((item) => item.splitId ? [item.splitId] : []));
@@ -164,7 +165,7 @@ export function parseChromePreferences(options: ChromeParserOptions): BrowserTre
       const parentId = containingGroupIds.size === 1
         ? `chrome-${profileName}-group-${[...containingGroupIds][0]}`
         : workspaceId;
-      nodes.push({ id: splitNodeId(splitId), browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "split_view", title: "Split View", url: null, parent_id: parentId, sort_order: firstTabIndex, snapshot_time: snapshotTime });
+      nodes.push({ id: splitNodeId(splitId), browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "split_view", title: "Split View", url: null, parent_id: parentId, sort_order: firstTabIndex, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
     }
 
     windowTabs.sort((left, right) => left.index - right.index || left.id - right.id).forEach((item) => {
@@ -175,7 +176,7 @@ export function parseChromePreferences(options: ChromeParserOptions): BrowserTre
         : item.groupId && groupIds.has(item.groupId)
           ? `chrome-${profileName}-group-${item.groupId}`
           : workspaceId;
-      nodes.push({ id: `chrome-${profileName}-tab-${item.id}`, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: item.pinned ? "pinned_tab" : "tab", title: item.title || tabTitle(item.url!), url: item.url!, parent_id: parentId, sort_order: item.index, snapshot_time: snapshotTime });
+      nodes.push({ id: `chrome-${profileName}-tab-${item.id}`, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: item.pinned ? "pinned_tab" : "tab", title: item.title || tabTitle(item.url!), url: item.url!, parent_id: parentId, sort_order: item.index, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
     });
 
     // Preferences alone still make named groups visible when Chrome has not
@@ -183,7 +184,7 @@ export function parseChromePreferences(options: ChromeParserOptions): BrowserTre
     if (windowTabs.length === 0) {
       let groupIndex = 0;
       for (const [groupId, title] of preferenceGroups) {
-        nodes.push({ id: `chrome-${profileName}-group-${groupId}`, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "folder", title: title || `Group ${groupIndex + 1}`, url: null, parent_id: workspaceId, sort_order: groupIndex++, snapshot_time: snapshotTime });
+        nodes.push({ id: `chrome-${profileName}-group-${groupId}`, browser_name: "chrome", os_type: osType, profile_name: profileName, node_type: "folder", title: title || `Group ${groupIndex + 1}`, url: null, parent_id: workspaceId, sort_order: groupIndex++, snapshot_time: snapshotTime, lastUpdateTime: snapshotTime });
       }
     }
   });

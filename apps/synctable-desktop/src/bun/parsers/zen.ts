@@ -194,6 +194,7 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
     parent_id: null,
     sort_order: 0,
     snapshot_time: snapshotTime,
+    lastUpdateTime: snapshotTime,
   });
 
   const windows = data.windows || [];
@@ -210,6 +211,7 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
       parent_id: rootId,
       sort_order: winIdx,
       snapshot_time: snapshotTime,
+      lastUpdateTime: snapshotTime,
     });
 
     const workspaceIds = new Map<string, string>();
@@ -230,6 +232,7 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
         parent_id: windowId,
         sort_order: spaceIdx,
         snapshot_time: snapshotTime,
+        lastUpdateTime: snapshotTime,
         theme_color,
         theme_colors,
         icon,
@@ -253,6 +256,7 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
           parent_id: windowId,
           sort_order: spaces.length,
           snapshot_time: snapshotTime,
+          lastUpdateTime: snapshotTime,
         });
       }
       return defaultWorkspaceId;
@@ -293,6 +297,7 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
         parent_id: parentId,
         sort_order: folderSortOrders.get(String(folder.id)) ?? folderIdx,
         snapshot_time: snapshotTime,
+        lastUpdateTime: snapshotTime,
       });
     });
 
@@ -318,6 +323,7 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
         parent_id: folderId || getWorkspaceId(tab.zenWorkspace),
         sort_order: tabIdx,
         snapshot_time: snapshotTime,
+        lastUpdateTime: snapshotTime,
       });
     });
   });

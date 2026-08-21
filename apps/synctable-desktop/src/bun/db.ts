@@ -29,6 +29,7 @@ export class SyncTableDB {
         parent_id VARCHAR(255),
         sort_order INT NOT NULL,
         snapshot_time TIMESTAMP NOT NULL,
+        last_update_time TIMESTAMP,
         theme_color TEXT,
         theme_colors TEXT,
         icon TEXT
@@ -38,6 +39,9 @@ export class SyncTableDB {
     // Safely migrate existing tables if columns do not exist
     const columns = this.db.query("PRAGMA table_info(browser_trees)").all() as { name: string }[];
     const colNames = new Set(columns.map((c) => c.name));
+    if (!colNames.has("last_update_time")) {
+      this.db.run("ALTER TABLE browser_trees ADD COLUMN last_update_time TIMESTAMP");
+    }
     if (!colNames.has("theme_color")) {
       this.db.run("ALTER TABLE browser_trees ADD COLUMN theme_color TEXT");
     }
@@ -162,9 +166,9 @@ export class SyncTableDB {
   public upsertNodes(nodes: BrowserTreeNode[]) {
     const upsertStmt = this.db.prepare(`
       INSERT INTO browser_trees (
-        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time, theme_color, theme_colors, icon
+        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time, last_update_time, theme_color, theme_colors, icon
       ) VALUES (
-        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time, $theme_color, $theme_colors, $icon
+        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time, $last_update_time, $theme_color, $theme_colors, $icon
       )
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
@@ -172,6 +176,7 @@ export class SyncTableDB {
         parent_id = excluded.parent_id,
         sort_order = excluded.sort_order,
         snapshot_time = excluded.snapshot_time,
+        last_update_time = excluded.last_update_time,
         theme_color = excluded.theme_color,
         theme_colors = excluded.theme_colors,
         icon = excluded.icon;
@@ -190,6 +195,7 @@ export class SyncTableDB {
           $parent_id: item.parent_id,
           $sort_order: item.sort_order,
           $snapshot_time: item.snapshot_time,
+          $last_update_time: item.lastUpdateTime ?? item.snapshot_time,
           $theme_color: item.theme_color ?? null,
           $theme_colors: item.theme_colors ? JSON.stringify(item.theme_colors) : null,
           $icon: item.icon ?? null,
@@ -206,9 +212,9 @@ export class SyncTableDB {
     );
     const upsertStmt = this.db.prepare(`
       INSERT INTO browser_trees (
-        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time, theme_color, theme_colors, icon
+        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time, last_update_time, theme_color, theme_colors, icon
       ) VALUES (
-        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time, $theme_color, $theme_colors, $icon
+        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time, $last_update_time, $theme_color, $theme_colors, $icon
       )
     `);
 
@@ -226,6 +232,7 @@ export class SyncTableDB {
           $parent_id: item.parent_id,
           $sort_order: item.sort_order,
           $snapshot_time: item.snapshot_time,
+          $last_update_time: item.lastUpdateTime ?? item.snapshot_time,
           $theme_color: item.theme_color ?? null,
           $theme_colors: item.theme_colors ? JSON.stringify(item.theme_colors) : null,
           $icon: item.icon ?? null,
@@ -240,9 +247,9 @@ export class SyncTableDB {
     );
     const insertStmt = this.db.prepare(`
       INSERT INTO browser_trees (
-        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time, theme_color, theme_colors, icon
+        id, browser_name, os_type, profile_name, node_type, title, url, parent_id, sort_order, snapshot_time, last_update_time, theme_color, theme_colors, icon
       ) VALUES (
-        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time, $theme_color, $theme_colors, $icon
+        $id, $browser_name, $os_type, $profile_name, $node_type, $title, $url, $parent_id, $sort_order, $snapshot_time, $last_update_time, $theme_color, $theme_colors, $icon
       )
     `);
 
@@ -260,6 +267,7 @@ export class SyncTableDB {
           $parent_id: item.parent_id,
           $sort_order: item.sort_order,
           $snapshot_time: item.snapshot_time,
+          $last_update_time: item.lastUpdateTime ?? item.snapshot_time,
           $theme_color: item.theme_color ?? null,
           $theme_colors: item.theme_colors ? JSON.stringify(item.theme_colors) : null,
           $icon: item.icon ?? null,
@@ -291,6 +299,7 @@ export class SyncTableDB {
     const rows = this.db.query(query).all(params) as any[];
     return rows.map((row) => ({
       ...row,
+      lastUpdateTime: row.last_update_time || row.snapshot_time,
       theme_colors: row.theme_colors
         ? (typeof row.theme_colors === "string" ? JSON.parse(row.theme_colors) : row.theme_colors)
         : null,
@@ -317,7 +326,35 @@ export class SyncTableDB {
       }
     }
 
+    // Sort root nodes by their lastUpdateTime DESC (most recently updated browser first)
+    rootNodes.sort((a, b) => {
+      const timeA = a.lastUpdateTime || a.snapshot_time || "";
+      const timeB = b.lastUpdateTime || b.snapshot_time || "";
+      if (timeA && timeB) {
+        return timeB.localeCompare(timeA);
+      }
+      if (timeA) return -1;
+      if (timeB) return 1;
+      return a.sort_order - b.sort_order;
+    });
+
     return rootNodes;
+  }
+
+  public getBrowserLastUpdateTimes(): Record<string, string> {
+    const rows = this.db
+      .query(
+        "SELECT browser_name, MAX(COALESCE(last_update_time, snapshot_time)) as lastUpdate FROM browser_trees GROUP BY browser_name"
+      )
+      .all() as { browser_name: string; lastUpdate: string | null }[];
+
+    const result: Record<string, string> = {};
+    for (const r of rows) {
+      if (r.browser_name && r.lastUpdate) {
+        result[r.browser_name.toLowerCase()] = r.lastUpdate;
+      }
+    }
+    return result;
   }
 
   public getStats(): SyncStats {
@@ -325,7 +362,7 @@ export class SyncTableDB {
     const workspacesRow = this.db.query("SELECT COUNT(*) as count FROM browser_trees WHERE node_type = 'workspace'").get() as { count: number };
     const foldersRow = this.db.query("SELECT COUNT(*) as count FROM browser_trees WHERE node_type = 'folder'").get() as { count: number };
     const tabsRow = this.db.query("SELECT COUNT(*) as count FROM browser_trees WHERE node_type IN ('tab', 'pinned_tab')").get() as { count: number };
-    const latestRow = this.db.query("SELECT MAX(snapshot_time) as lastSync FROM browser_trees").get() as { lastSync: string | null };
+    const latestRow = this.db.query("SELECT MAX(COALESCE(last_update_time, snapshot_time)) as lastSync FROM browser_trees").get() as { lastSync: string | null };
 
     return {
       totalNodes: totalRow?.count || 0,

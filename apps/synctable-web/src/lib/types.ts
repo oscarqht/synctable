@@ -31,6 +31,7 @@ export interface BrowserTreeNode {
   parent_id: string | null;
   sort_order: number;
   snapshot_time: string;
+  lastUpdateTime?: string | null;
   theme_color?: string | null;
   theme_colors?: string[] | null;
   icon?: string | null;

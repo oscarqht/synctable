@@ -41,15 +41,29 @@ export function LocalTab({
       .filter((node): node is BrowserTreeNode => node !== null && countTabs(node) > 0);
   }, [trees]);
 
-  // Compute available browsers
+  // Compute available browsers, sorted by lastUpdateTime DESC
   const availableBrowsers = useMemo(() => {
-    const set = new Set<string>();
+    const browserTimeMap = new Map<string, string>();
     validTrees.forEach((node) => {
       if (node.browser_name && countTabs(node) > 0) {
-        set.add(node.browser_name.toLowerCase());
+        const b = node.browser_name.toLowerCase();
+        const time = node.lastUpdateTime || node.snapshot_time || "";
+        const existing = browserTimeMap.get(b) || "";
+        if (time > existing) {
+          browserTimeMap.set(b, time);
+        }
       }
     });
-    return Array.from(set).sort();
+    return Array.from(browserTimeMap.keys()).sort((a, b) => {
+      const timeA = browserTimeMap.get(a) || "";
+      const timeB = browserTimeMap.get(b) || "";
+      if (timeA && timeB) {
+        return timeB.localeCompare(timeA);
+      }
+      if (timeA) return -1;
+      if (timeB) return 1;
+      return a.localeCompare(b);
+    });
   }, [validTrees]);
 
   return (

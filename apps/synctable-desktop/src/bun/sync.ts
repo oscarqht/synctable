@@ -33,6 +33,24 @@ export function computeTreeHash(nodes: BrowserTreeNode[]): string {
   return hasher.digest("hex");
 }
 
+function getProfileLastModified(sourcePath: string, sessionPath?: string, fallback: string = new Date().toISOString()): string {
+  try {
+    let latestMs = 0;
+    if (existsSync(sourcePath)) {
+      latestMs = Math.max(latestMs, statSync(sourcePath).mtimeMs);
+    }
+    if (sessionPath && existsSync(sessionPath)) {
+      latestMs = Math.max(latestMs, statSync(sessionPath).mtimeMs);
+    }
+    if (latestMs > 0) {
+      return new Date(latestMs).toISOString();
+    }
+  } catch {
+    // fallback
+  }
+  return fallback;
+}
+
 export class BrowserSyncManager {
   private db: SyncTableDB;
   private keychain: KeychainService;
@@ -173,11 +191,12 @@ export class BrowserSyncManager {
 
     for (const prof of profiles) {
       try {
+        const browserUpdateTime = getProfileLastModified(prof.sourcePath, prof.sessionPath, timestamp);
         if (prof.browser === "dia") {
           const nodes = parseDiaTree({
             userDataPath: prof.sourcePath,
             osType: this.osType,
-            snapshotTime: timestamp,
+            snapshotTime: browserUpdateTime,
           });
           if (nodes.length > 0) {
             // Dia's profile databases are merged into one browser-wide tree.
@@ -197,7 +216,7 @@ export class BrowserSyncManager {
             filePath: safeTmpFile,
             osType: this.osType,
             profileName: prof.profileName,
-            snapshotTime: timestamp,
+            snapshotTime: browserUpdateTime,
           });
         } else if (prof.browser === "chrome") {
           const safeSessionFile = prof.sessionPath ? `${safeTmpFile}_session` : undefined;
@@ -207,7 +226,7 @@ export class BrowserSyncManager {
             sessionFilePath: safeSessionFile,
             osType: this.osType,
             profileName: prof.profileName,
-            snapshotTime: timestamp,
+            snapshotTime: browserUpdateTime,
           });
         } else if (prof.browser === "vivaldi") {
           const safeSessionFile = prof.sessionPath ? `${safeTmpFile}_session` : undefined;
@@ -217,21 +236,21 @@ export class BrowserSyncManager {
             sessionFilePath: safeSessionFile,
             osType: this.osType,
             profileName: prof.profileName,
-            snapshotTime: timestamp,
+            snapshotTime: browserUpdateTime,
           });
         } else if (prof.browser === "zen") {
           nodes = parseZenSessionstore({
             filePath: safeTmpFile,
             osType: this.osType,
             profileName: prof.profileName,
-            snapshotTime: timestamp,
+            snapshotTime: browserUpdateTime,
           });
         } else if (prof.browser === "firefox") {
           nodes = parseFirefoxSessionstore({
             filePath: safeTmpFile,
             osType: this.osType,
             profileName: prof.profileName,
-            snapshotTime: timestamp,
+            snapshotTime: browserUpdateTime,
           });
         }
 
@@ -273,6 +292,7 @@ export class BrowserSyncManager {
   public getStatsWithDetected(): SyncStats {
     const baseStats = this.db.getStats();
     const profiles = this.getBrowserProfiles();
+    const lastUpdateTimes = this.db.getBrowserLastUpdateTimes();
 
     const browsers = [
       { name: "chrome", displayName: "Google Chrome" },
@@ -283,16 +303,35 @@ export class BrowserSyncManager {
       { name: "dia", displayName: "Dia Browser" },
     ];
 
-    baseStats.detectedBrowsers = browsers.map((b) => {
+    const detected = browsers.map((b) => {
       const matched = profiles.filter((p) => p.browser === b.name);
+      const lastUpdate = lastUpdateTimes[b.name.toLowerCase()] || undefined;
       return {
         name: b.name,
         displayName: b.displayName,
         detected: matched.length > 0,
         profileCount: matched.length,
+        lastSync: lastUpdate,
+        lastUpdateTime: lastUpdate,
       };
     });
 
+    // Sort detected browsers by lastUpdateTime DESC
+    detected.sort((a, b) => {
+      const timeA = a.lastUpdateTime || "";
+      const timeB = b.lastUpdateTime || "";
+      if (timeA && timeB) {
+        return timeB.localeCompare(timeA);
+      }
+      if (timeA) return -1;
+      if (timeB) return 1;
+      if (a.detected !== b.detected) {
+        return a.detected ? -1 : 1;
+      }
+      return a.displayName.localeCompare(b.displayName);
+    });
+
+    baseStats.detectedBrowsers = detected;
     return baseStats;
   }
 }
