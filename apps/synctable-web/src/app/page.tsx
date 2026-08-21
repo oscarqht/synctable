@@ -270,12 +270,12 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white border border-sky-200/60 flex items-center justify-center shadow-xs text-lg select-none">
-              🍕
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white border border-sky-200/60 flex items-center justify-center shadow-xs overflow-hidden select-none">
+              <img src="/logo.png" alt="Synctable Logo" className="w-6 h-6 object-contain" />
             </div>
             <div className="flex flex-col sm:block justify-center">
               <div className="font-bold text-base tracking-tight bg-gradient-to-r from-slate-900 via-slate-800 to-slate-700 bg-clip-text text-transparent flex items-center gap-2">
-                SyncTable{" "}
+                Synctable{" "}
                 <span className="hidden sm:inline-flex text-[11px] font-semibold uppercase px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-700 border border-cyan-200">
                   Web
                 </span>
@@ -394,7 +394,7 @@ export default function Home() {
           /* Loading Auth State */
           <div className="flex-1 flex flex-col items-center justify-center py-24 text-slate-500 space-y-3">
             <Loader2 className="w-8 h-8 animate-spin text-cyan-600" />
-            <p className="text-sm">Loading SyncTable...</p>
+            <p className="text-sm">Loading Synctable...</p>
           </div>
         ) : !user ? (
           /* BEFORE LOGIN: Landing & Raindrop Connect Card */
@@ -540,7 +540,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-slate-200/80 py-4 mt-auto text-center text-xs text-slate-500 bg-white">
-        SyncTable Monorepo &middot; Desktop Daemon & Next.js Web App
+        Synctable Monorepo &middot; Desktop Daemon & Next.js Web App
       </footer>
     </main>
   );

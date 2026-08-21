@@ -316,7 +316,7 @@ export function MultiDeviceCardsPortal({
           </h3>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             The root collection was found, but no non-empty device snapshots have been uploaded yet.
-            Trigger a sync from your SyncTable desktop daemon.
+            Trigger a sync from your Synctable desktop daemon.
           </p>
         </div>
         <div className="flex items-center justify-center gap-3">

@@ -1,11 +1,11 @@
 <div align="center">
 
-# SyncTable
+# Synctable
 
 **Cross-browser state backup and tree synchronization utility.**
 
 <p align="center">
-  <img src="docs/poster.jpeg" alt="SyncTable Poster" width="100%" />
+  <img src="docs/poster.jpeg" alt="Synctable Poster" width="100%" />
 </p>
 
 [![PRD](https://img.shields.io/badge/PRD-View%20Doc-blue)](docs/PRD.md)
@@ -19,7 +19,7 @@
 
 Modern browsers have evolved beyond flat tab rows into rich, multi-layered interfaces—featuring **spaces, nested folders, tab stacks, and vertical sidebars** (e.g., Arc, Zen, Vivaldi, Chrome).
 
-However, standard browser extensions cannot access proprietary layout layers or read active session states across disparate engines. **SyncTable** solves this by running as a lightweight desktop background daemon that periodically reads, normalizes, and backs up tab trees and workspace configurations across different browsers into a unified relational schema.
+However, standard browser extensions cannot access proprietary layout layers or read active session states across disparate engines. **Synctable** solves this by running as a lightweight desktop background daemon that periodically reads, normalizes, and backs up tab trees and workspace configurations across different browsers into a unified relational schema.
 
 ---
 
@@ -127,7 +127,7 @@ synctable/
 - [Bun](https://bun.sh) (v1.1+)
 - macOS Command Line Tools (`clang` and `swiftc`) for the native readers
 
-Dia does not need to be running for sync, and SyncTable does not use Dia's user
+Dia does not need to be running for sync, and Synctable does not use Dia's user
 interface. Dia encrypts `tabs.db`, so macOS may ask once for access to the
 existing **Dia Safe Storage** Keychain item. The helper derives each profile's
 database key in memory, opens the database read-only, and never prints or stores

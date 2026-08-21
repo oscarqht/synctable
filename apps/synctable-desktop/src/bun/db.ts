@@ -8,7 +8,7 @@ const DB_DIR = join(homedir(), ".browser_sync_cache");
 mkdirSync(DB_DIR, { recursive: true });
 const DB_PATH = join(DB_DIR, "synctable.sqlite");
 
-export class SyncTableDB {
+export class SynctableDB {
   private db: Database;
 
   constructor(path = DB_PATH) {

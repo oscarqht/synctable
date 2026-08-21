@@ -303,7 +303,7 @@ export function parseZenSessionData(data: any, options: Omit<ZenParserOptions, "
 
     tabs.forEach((tab: any, tabIdx: number) => {
       // Zen creates an empty about:blank tab as each folder's internal group
-      // anchor. It is not displayed as a user tab and must not leak into SyncTable.
+      // anchor. It is not displayed as a user tab and must not leak into Synctable.
       if (tab.zenIsEmpty) return;
       const activeEntryIdx = (tab.index || 1) - 1;
       const entry = tab.entries?.[activeEntryIdx] || tab.entries?.[tab.entries.length - 1];

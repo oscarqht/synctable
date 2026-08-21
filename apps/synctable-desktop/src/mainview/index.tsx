@@ -1,10 +1,10 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { Electroview } from "electrobun/view";
-import type { SyncTableRPCSchema } from "../shared/types";
+import type { SynctableRPCSchema } from "../shared/types";
 import { App } from "./App";
 
-const rpc = Electroview.defineRPC<SyncTableRPCSchema>({
+const rpc = Electroview.defineRPC<SynctableRPCSchema>({
   handlers: {
     requests: {},
     messages: {

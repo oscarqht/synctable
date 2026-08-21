@@ -9,7 +9,7 @@ import type {
 import { MultiDeviceCardsPortal, countTabs } from "@synctable/ui";
 import { LocalTab } from "./LocalTab";
 import { SettingsModal } from "./SettingsModal";
-import type { SyncTableRPCSchema } from "../shared/types";
+import type { SynctableRPCSchema } from "../shared/types";
 
 interface AppProps {
   rpc: any;
@@ -174,12 +174,12 @@ export function App({ rpc }: AppProps) {
       >
         {/* Left: Brand with spacing for macOS traffic light buttons */}
         <div className="flex items-center space-x-2.5 pl-20">
-          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white dark:from-slate-800 dark:via-slate-800/60 dark:to-slate-900 border border-sky-200/60 dark:border-slate-700/60 flex items-center justify-center shadow-xs text-sm select-none">
-            🍕
+          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-sky-50 via-blue-50/40 to-white dark:from-slate-800 dark:via-slate-800/60 dark:to-slate-900 border border-sky-200/60 dark:border-slate-700/60 flex items-center justify-center shadow-xs overflow-hidden select-none">
+            <img src="assets/logo.png" alt="Synctable" className="w-5 h-5 object-contain" />
           </div>
           <div className="hidden min-[720px]:flex items-baseline space-x-1.5">
             <span className="text-xs font-extrabold tracking-tight text-slate-900 dark:text-slate-100">
-              SyncTable
+              Synctable
             </span>
             <span className="text-[10px] font-medium text-slate-400 font-mono">
               v0.1.0

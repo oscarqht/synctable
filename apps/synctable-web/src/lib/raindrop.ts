@@ -300,7 +300,7 @@ export async function fetchRaindropFileContent(
       method: "GET",
       headers: {
         Authorization: `Bearer ${token}`,
-        "User-Agent": "SyncTable-Web/1.0",
+        "User-Agent": "Synctable-Web/1.0",
       },
       redirect: "manual",
       cache: "no-store",

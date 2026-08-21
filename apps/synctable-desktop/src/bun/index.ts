@@ -2,14 +2,14 @@ import { ApplicationMenu, BrowserView, BrowserWindow, defineElectrobunRPC, Utils
 import { existsSync, watch } from "node:fs";
 import { platform } from "node:os";
 import { join } from "node:path";
-import { SyncTableDB } from "./db";
+import { SynctableDB } from "./db";
 import { defaultKeychain } from "./keychain";
 import { defaultRaindropClient } from "./raindrop";
 import { BrowserSyncManager } from "./sync";
-import type { CloudSyncResponse, SyncTableRPCSchema } from "../shared/types";
+import type { CloudSyncResponse, SynctableRPCSchema } from "../shared/types";
 
 
-const db = new SyncTableDB();
+const db = new SynctableDB();
 const syncManager = new BrowserSyncManager(db);
 const DEFAULT_WINDOW_FRAME = { x: 120, y: 80, width: 1150, height: 780 };
 const savedWindowSize = db.getWindowSize();
@@ -17,7 +17,7 @@ const savedWindowSize = db.getWindowSize();
 if (platform() === "darwin") {
   ApplicationMenu.setApplicationMenu([
     {
-      label: "SyncTable",
+      label: "Synctable",
       submenu: [
         { role: "about" },
         { type: "divider" },
@@ -51,7 +51,7 @@ if (platform() === "darwin") {
   ]);
 }
 
-const rpc = defineElectrobunRPC<SyncTableRPCSchema>("bun", {
+const rpc = defineElectrobunRPC<SynctableRPCSchema>("bun", {
   handlers: {
     requests: {
       getStats: () => {
@@ -157,7 +157,7 @@ async function getCachedOrFreshCloudData(forceRefresh = false): Promise<CloudSyn
 
 // Create main window
 const win = new BrowserWindow({
-  title: "SyncTable",
+  title: "Synctable",
   frame: {
     ...DEFAULT_WINDOW_FRAME,
     ...savedWindowSize,
@@ -203,16 +203,16 @@ let autoSyncPaused = false;
 
 async function runAutoSync(reason: "periodic" | "resumed" | "file_change") {
   if (autoSyncPaused) {
-    console.log("[SyncTable Daemon] Auto-sync paused while the session is inactive.");
+    console.log("[Synctable Daemon] Auto-sync paused while the session is inactive.");
     return;
   }
 
   try {
-    console.log(`[SyncTable Daemon] Starting ${reason} background sync...`);
+    console.log(`[Synctable Daemon] Starting ${reason} background sync...`);
     const result = await syncAndNotify();
-    console.log(`[SyncTable Daemon] Auto-sync complete (${result.syncedNodesCount} nodes).`);
+    console.log(`[Synctable Daemon] Auto-sync complete (${result.syncedNodesCount} nodes).`);
   } catch (err) {
-    console.error("[SyncTable Daemon] Auto-sync error:", err);
+    console.error("[Synctable Daemon] Auto-sync error:", err);
   }
 }
 
@@ -230,7 +230,7 @@ function monitorMacLifecycle() {
 
   const executable = findLifecycleMonitor();
   if (!executable) {
-    console.error("[SyncTable Daemon] Lifecycle monitor is unavailable; auto-sync will continue normally.");
+    console.error("[Synctable Daemon] Lifecycle monitor is unavailable; auto-sync will continue normally.");
     return;
   }
 
@@ -248,15 +248,15 @@ function monitorMacLifecycle() {
       for (const state of states) {
         if (state === "paused" && !autoSyncPaused) {
           autoSyncPaused = true;
-          console.log("[SyncTable Daemon] Auto-sync paused because macOS became inactive.");
+          console.log("[Synctable Daemon] Auto-sync paused because macOS became inactive.");
         } else if (state === "resumed" && autoSyncPaused) {
           autoSyncPaused = false;
-          console.log("[SyncTable Daemon] Auto-sync resumed because macOS became active.");
+          console.log("[Synctable Daemon] Auto-sync resumed because macOS became active.");
           runAutoSync("resumed");
         }
       }
     }
-  })().catch((err) => console.error("[SyncTable Daemon] Lifecycle monitor error:", err));
+  })().catch((err) => console.error("[Synctable Daemon] Lifecycle monitor error:", err));
 }
 
 function monitorBrowserFileChanges() {
@@ -267,7 +267,7 @@ function monitorBrowserFileChanges() {
   const triggerFileChangeSync = (browser: string, path: string) => {
     clearTimeout(fileChangeTimer);
     fileChangeTimer = setTimeout(() => {
-      console.log(`[SyncTable Daemon] Detected change in ${browser} (${path}), triggering sync...`);
+      console.log(`[Synctable Daemon] Detected change in ${browser} (${path}), triggering sync...`);
       runAutoSync("file_change");
     }, 1000);
   };
@@ -282,7 +282,7 @@ function monitorBrowserFileChanges() {
             triggerFileChangeSync(prof.browser, p);
           });
         } catch (err) {
-          console.warn(`[SyncTable Daemon] Could not watch ${p}:`, err);
+          console.warn(`[Synctable Daemon] Could not watch ${p}:`, err);
         }
       }
     }
@@ -296,4 +296,4 @@ setInterval(() => {
   runAutoSync("periodic");
 }, SYNC_INTERVAL_MS);
 
-console.log("SyncTable Electrobun main process initialized.");
+console.log("Synctable Electrobun main process initialized.");

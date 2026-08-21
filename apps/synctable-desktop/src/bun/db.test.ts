@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { hostname } from "node:os";
-import { SyncTableDB } from "./db";
+import { SynctableDB } from "./db";
 import type { BrowserTreeNode } from "../shared/types";
 
 function root(id: string, profileName: string): BrowserTreeNode {
@@ -18,9 +18,9 @@ function root(id: string, profileName: string): BrowserTreeNode {
   };
 }
 
-describe("SyncTableDB", () => {
+describe("SynctableDB", () => {
   test("replaces all legacy Dia profile snapshots with the merged browser tree", () => {
-    const db = new SyncTableDB(":memory:");
+    const db = new SynctableDB(":memory:");
     db.replaceProfileNodes("dia", "Default", [root("old-default", "Default")]);
     db.replaceProfileNodes("dia", "Profile 1", [root("old-profile-1", "Profile 1")]);
 
@@ -32,7 +32,7 @@ describe("SyncTableDB", () => {
   });
 
   test("uses the system device name until a custom device name is saved", () => {
-    const db = new SyncTableDB(":memory:");
+    const db = new SynctableDB(":memory:");
 
     expect(db.getAppPreferences().deviceName).toBe(hostname());
 
@@ -42,7 +42,7 @@ describe("SyncTableDB", () => {
   });
 
   test("creates and reuses a stable unique device identifier", () => {
-    const db = new SyncTableDB(":memory:");
+    const db = new SynctableDB(":memory:");
 
     const id1 = db.getOrCreateDeviceId();
     expect(typeof id1).toBe("string");
@@ -53,7 +53,7 @@ describe("SyncTableDB", () => {
   });
 
   test("persists and retrieves the last uploaded tree hash", () => {
-    const db = new SyncTableDB(":memory:");
+    const db = new SynctableDB(":memory:");
 
     expect(db.getLastUploadedTreeHash()).toBeNull();
 
@@ -65,7 +65,7 @@ describe("SyncTableDB", () => {
   });
 
   test("persists and retrieves theme_color, theme_colors, and icon", () => {
-    const db = new SyncTableDB(":memory:");
+    const db = new SynctableDB(":memory:");
     const spaceNode: BrowserTreeNode = {
       id: "arc-space-work",
       browser_name: "arc",
@@ -97,7 +97,7 @@ describe("SyncTableDB", () => {
   });
 
   test("persists lastUpdateTime and sorts getTree root nodes by lastUpdateTime DESC", () => {
-    const db = new SyncTableDB(":memory:");
+    const db = new SynctableDB(":memory:");
 
     const olderChromeNode: BrowserTreeNode = {
       id: "chrome-root",

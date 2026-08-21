@@ -4,7 +4,7 @@ import { platform } from "node:os";
 
 describe("KeychainService", () => {
   const isMac = platform() === "darwin";
-  const testService = new KeychainService("SyncTable-UnitTest");
+  const testService = new KeychainService("Synctable-UnitTest");
   const testAccount = "unit_test_token";
 
   afterAll(() => {

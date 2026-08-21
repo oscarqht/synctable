@@ -1,6 +1,6 @@
 import { platform } from "node:os";
 
-export const DEFAULT_KEYCHAIN_SERVICE = "SyncTable";
+export const DEFAULT_KEYCHAIN_SERVICE = "Synctable";
 export const RAINDROP_ACCOUNT = "raindrop_api_token";
 
 export class KeychainService {

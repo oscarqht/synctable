@@ -52,7 +52,7 @@ export function SettingsModal({
           <div className="flex items-center space-x-2">
             <span className="text-base">⚙️</span>
             <h2 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              SyncTable Preferences
+              Synctable Preferences
             </h2>
           </div>
           <button

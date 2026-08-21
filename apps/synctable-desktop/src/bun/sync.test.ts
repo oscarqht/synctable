@@ -1,6 +1,6 @@
 import { describe, expect, test, mock } from "bun:test";
 import { BrowserSyncManager, canonicalizeTree, computeTreeHash } from "./sync";
-import { SyncTableDB } from "./db";
+import { SynctableDB } from "./db";
 import { KeychainService } from "./keychain";
 import { RaindropClient } from "./raindrop";
 import type { BrowserTreeNode } from "../shared/types";
@@ -38,7 +38,7 @@ describe("canonicalizeTree & computeTreeHash", () => {
 
 describe("BrowserSyncManager Raindrop Sync", () => {
   test("skips Raindrop upload when token is empty", async () => {
-    const db = new SyncTableDB(":memory:");
+    const db = new SynctableDB(":memory:");
     db.upsertNodes([createTab("t1", "GitHub", "https://github.com", "2026-08-19T01:00:00.000Z")]);
 
     const keychain = new KeychainService("mock");
@@ -61,7 +61,7 @@ describe("BrowserSyncManager Raindrop Sync", () => {
   });
 
   test("uploads full tree to Raindrop when token is present and tree changed", async () => {
-    const db = new SyncTableDB(":memory:");
+    const db = new SynctableDB(":memory:");
     db.upsertNodes([createTab("t1", "GitHub", "https://github.com", "2026-08-19T01:00:00.000Z")]);
 
     const keychain = new KeychainService("mock");
@@ -109,7 +109,7 @@ describe("BrowserSyncManager Raindrop Sync", () => {
   });
 
   test("captures Raindrop errors in SyncResult without throwing", async () => {
-    const db = new SyncTableDB(":memory:");
+    const db = new SynctableDB(":memory:");
     db.upsertNodes([createTab("t1", "GitHub", "https://github.com", "2026-08-19T01:00:00.000Z")]);
 
     const keychain = new KeychainService("mock");
@@ -130,7 +130,7 @@ describe("BrowserSyncManager Raindrop Sync", () => {
   });
 
   test("getStatsWithDetected returns lastUpdateTime and sorts detected browsers DESC", () => {
-    const db = new SyncTableDB(":memory:");
+    const db = new SynctableDB(":memory:");
     db.upsertNodes([
       {
         id: "chrome-t1",
@@ -183,7 +183,7 @@ describe("BrowserSyncManager Raindrop Sync", () => {
   });
 
   test("only updates lastUpdateTime when there are actual valid changes", async () => {
-    const db = new SyncTableDB(":memory:");
+    const db = new SynctableDB(":memory:");
     const manager = new BrowserSyncManager(db, new KeychainService("mock"), new RaindropClient());
 
     // Initial state: Arc has 1 tab
@@ -301,7 +301,7 @@ describe("BrowserSyncManager Raindrop Sync", () => {
         os_type: "macos",
         profile_name: "Default",
         node_type: "tab",
-        title: "GitHub - SyncTable Repo", // Title changed
+        title: "GitHub - Synctable Repo", // Title changed
         url: "https://github.com",
         parent_id: "arc-root",
         sort_order: 0,

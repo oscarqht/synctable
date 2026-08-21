@@ -348,7 +348,7 @@ export class RaindropClient {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
-          "User-Agent": "SyncTable/1.0",
+          "User-Agent": "Synctable/1.0",
         },
         redirect: "manual",
         signal: AbortSignal.timeout(6000),

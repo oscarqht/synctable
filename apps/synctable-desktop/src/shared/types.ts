@@ -91,7 +91,7 @@ export interface CloudSyncResponse {
   error?: string;
 }
 
-export interface SyncTableRPCSchema extends ElectrobunRPCSchema {
+export interface SynctableRPCSchema extends ElectrobunRPCSchema {
   bun: {
     requests: {
       getStats: {

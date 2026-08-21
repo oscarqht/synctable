@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { homedir, platform } from "node:os";
 import type { BrowserTreeNode, OSType, SyncResult, SyncStats } from "../shared/types";
 import { parseArcSidebar, parseChromePreferences, parseDiaTree, parseFirefoxSessionstore, parseVivaldiPreferences, parseZenSessionstore } from "./parsers";
-import type { SyncTableDB } from "./db";
+import type { SynctableDB } from "./db";
 import { defaultKeychain, KeychainService } from "./keychain";
 import { defaultRaindropClient, RaindropClient } from "./raindrop";
 
@@ -36,14 +36,14 @@ export function computeTreeHash(nodes: BrowserTreeNode[]): string {
 }
 
 export class BrowserSyncManager {
-  private db: SyncTableDB;
+  private db: SynctableDB;
   private keychain: KeychainService;
   private raindropClient: RaindropClient;
   private osType: OSType;
   private cacheDir: string;
 
   constructor(
-    db: SyncTableDB,
+    db: SynctableDB,
     keychain: KeychainService = defaultKeychain,
     raindropClient: RaindropClient = defaultRaindropClient
   ) {
@@ -284,7 +284,7 @@ export class BrowserSyncManager {
       }
     } catch (err: any) {
       const message = err?.message || String(err);
-      console.error("[SyncTable] Raindrop sync error:", message);
+      console.error("[Synctable] Raindrop sync error:", message);
       errors.push({ browser: "raindrop", message });
     }
 
