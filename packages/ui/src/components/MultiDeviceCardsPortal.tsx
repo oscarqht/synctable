@@ -1,9 +1,13 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import type { SynctableSyncResponse, BrowserTreeNode } from "../types";
 import { countTabs } from "../utils/treeUtils";
 import { DeviceCard } from "./DeviceCard";
+
+
+const DEVICE_FILTER_KEY = "synctable_device_filter";
+const BROWSER_FILTER_KEY = "synctable_browser_filter";
 
 export interface MultiDeviceCardsPortalProps {
   data: SynctableSyncResponse | null;
@@ -30,6 +34,36 @@ export function MultiDeviceCardsPortal({
 }: MultiDeviceCardsPortalProps) {
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("all");
   const [internalSelectedBrowser, setInternalSelectedBrowser] = useState<string>("all");
+
+  // Load saved filters on mount
+  useEffect(() => {
+    try {
+      const savedDevice = localStorage.getItem(DEVICE_FILTER_KEY);
+      if (savedDevice) setSelectedDeviceId(savedDevice);
+
+      const savedBrowser = localStorage.getItem(BROWSER_FILTER_KEY);
+      if (savedBrowser) setInternalSelectedBrowser(savedBrowser);
+    } catch (e) {
+      console.warn("Failed to read filters from localStorage", e);
+    }
+  }, []);
+
+  // Save filters on change
+  useEffect(() => {
+    try {
+      localStorage.setItem(DEVICE_FILTER_KEY, selectedDeviceId);
+    } catch (e) {
+      console.warn("Failed to save device filter to localStorage", e);
+    }
+  }, [selectedDeviceId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(BROWSER_FILTER_KEY, internalSelectedBrowser);
+    } catch (e) {
+      console.warn("Failed to save browser filter to localStorage", e);
+    }
+  }, [internalSelectedBrowser]);
   const [internalSearchQuery, setInternalSearchQuery] = useState<string>("");
   const [tokenInput, setTokenInput] = useState<string>("");
   const [savingToken, setSavingToken] = useState<boolean>(false);
