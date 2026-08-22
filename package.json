@@ -11,6 +11,7 @@
 
   "scripts": {
     "dev:desktop": "bun --filter synctable-desktop dev",
+    "dev:desktop:admin": "powershell -Command \"Start-Process powershell -ArgumentList '-NoExit', '-Command', 'Set-Location (Get-Location); bun dev:desktop' -Verb RunAs\"",
     "dev:web": "bun --filter synctable-web dev",
     "build:desktop": "bun --filter synctable-desktop build",
     "build:web": "bun --filter synctable-web build",
@@ -18,3 +19,4 @@
     "typecheck": "bun --filter '*' typecheck"
   }
 }
+
