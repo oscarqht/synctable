@@ -438,7 +438,12 @@ export class RaindropClient {
 
       if (!deleteRes.ok) {
         const errorText = await deleteRes.text().catch(() => "");
-        console.warn(`[Raindrop] Failed to delete existing item ${item._id} (${deleteRes.status}): ${errorText}`);
+        throw new Error(`[Raindrop] Failed to delete existing item ${item._id} (${deleteRes.status}): ${errorText}`);
+      }
+
+      const resJson = await deleteRes.json().catch(() => ({}));
+      if (resJson.result === false) {
+         throw new Error(`[Raindrop] Failed to delete existing item ${item._id}: API returned result false`);
       }
     }
   }
