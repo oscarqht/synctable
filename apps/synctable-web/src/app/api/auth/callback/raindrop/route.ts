@@ -5,6 +5,7 @@ import {
   REFRESH_TOKEN_COOKIE,
   STATE_COOKIE,
 } from "@/lib/raindrop";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,37 @@ export async function GET(request: NextRequest) {
   if (!code) {
     baseUrl.searchParams.set("error", "No authorization code provided");
     return NextResponse.redirect(baseUrl);
+  }
+
+  // Cross-domain state redirection (for preview environments)
+  if (state && state.includes(".")) {
+    const [payloadB64, signature] = state.split(".");
+    try {
+      const payloadStr = Buffer.from(payloadB64, "base64url").toString("utf-8");
+      const secret = process.env.RAINDROP_CLIENT_SECRET || "";
+      if (secret) {
+        const hmac = crypto.createHmac("sha256", secret);
+        hmac.update(payloadStr);
+        const expectedSignature = hmac.digest("base64url");
+
+        const expectedBuf = Buffer.from(expectedSignature, 'utf8');
+        const providedBuf = Buffer.from(signature, 'utf8');
+
+        if (expectedBuf.length === providedBuf.length && crypto.timingSafeEqual(expectedBuf, providedBuf)) {
+          const payload = JSON.parse(payloadStr);
+          if (payload.origin && payload.origin !== request.nextUrl.origin) {
+            const redirectUrl = new URL(request.url);
+            const targetOrigin = new URL(payload.origin);
+            redirectUrl.host = targetOrigin.host;
+            redirectUrl.protocol = targetOrigin.protocol;
+            redirectUrl.port = targetOrigin.port;
+            return NextResponse.redirect(redirectUrl);
+          }
+        }
+      }
+    } catch (e) {
+      // ignore parsing errors, proceed as normal
+    }
   }
 
   const savedState = request.cookies.get(STATE_COOKIE)?.value;
