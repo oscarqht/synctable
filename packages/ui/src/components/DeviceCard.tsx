@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import type { BrowserTreeNode } from "../types";
+import { useState, useEffect } from "react";
 import {
   countTabs,
   countWorkspaces,
@@ -9,6 +10,29 @@ import {
   formatRelativeTime,
 } from "../utils/treeUtils";
 import { ZenSidebarView } from "./zen/ZenSidebarView";
+
+export function usePersistentCollapse(key: string, defaultCollapsed: boolean = false) {
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(defaultCollapsed);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const stored = localStorage.getItem(key);
+    if (stored !== null) {
+      setIsCollapsed(stored === "true");
+    }
+  }, [key]);
+
+  const toggle = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem(key, String(next));
+      return next;
+    });
+  };
+
+  return { isCollapsed, toggle, mounted };
+}
 
 export interface DeviceCardProps {
   deviceName: string;
@@ -22,6 +46,69 @@ export interface DeviceCardProps {
   emptyMessage?: string;
 }
 
+function BrowserSection({
+  deviceName,
+  browserName,
+  browserTrees,
+  browserLastUpdateTime,
+  searchQuery,
+  onOpenExternal,
+}: {
+  deviceName: string;
+  browserName: string;
+  browserTrees: BrowserTreeNode[];
+  browserLastUpdateTime: string;
+  searchQuery: string;
+  onOpenExternal?: (url: string) => void;
+}) {
+  const collapseKey = `synctable_collapse_browser_${deviceName}_${browserName}`;
+  const { isCollapsed, toggle, mounted } = usePersistentCollapse(collapseKey, false);
+
+  const workspaces = browserTrees.flatMap(extractWorkspacesFromRoot);
+  if (workspaces.length === 0) return null;
+
+  return (
+    <div className="space-y-6">
+      {/* Section Title */}
+      <div
+        className="flex justify-between items-end border-b border-surface-container-high pb-4 cursor-pointer select-none group"
+        onClick={toggle}
+      >
+        <div className="flex items-center gap-2">
+          <span
+            className={`material-symbols-outlined text-on-surface-variant transition-transform duration-200 ${!isCollapsed ? 'rotate-90' : ''}`}
+          >
+            chevron_right
+          </span>
+          <h3 className="font-title-md text-title-md font-bold uppercase text-on-surface group-hover:text-primary transition-colors">
+            {browserName}
+          </h3>
+        </div>
+        {browserLastUpdateTime && (
+          <span className="font-body-sm text-body-sm text-outline">
+            Updated {formatRelativeTime(browserLastUpdateTime)}
+          </span>
+        )}
+      </div>
+
+      {/* Workspace Cards Grid */}
+      {(!mounted || !isCollapsed) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1500px]:grid-cols-5 2xl:grid-cols-5 gap-gutter items-start">
+          {workspaces.map((wsItem, wsIndex) => (
+            <ZenSidebarView
+              key={wsItem.id}
+              workspaceItem={wsItem}
+              cardIndex={wsIndex}
+              searchQuery={searchQuery}
+              onOpenExternal={onOpenExternal}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DeviceCard({
   deviceName,
   badge,
@@ -33,6 +120,9 @@ export function DeviceCard({
   onOpenExternal,
   emptyMessage,
 }: DeviceCardProps) {
+  const collapseKey = `synctable_collapse_device_${deviceName}`;
+  const { isCollapsed, toggle, mounted } = usePersistentCollapse(collapseKey, false);
+
   const filteredRoots = useMemo(() => {
     return trees.filter((node) => {
       if (countTabs(node) === 0) return false;
@@ -120,11 +210,19 @@ export function DeviceCard({
     <div className="flex flex-col gap-8 w-full">
       {/* Dashboard Header */}
       <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-3 text-on-surface-variant flex-wrap">
-          <span className="material-symbols-outlined bg-surface-container-high text-on-surface p-2 rounded-lg">
+        <div
+          className="flex items-center gap-3 text-on-surface-variant flex-wrap cursor-pointer select-none group"
+          onClick={toggle}
+        >
+          <span
+            className={`material-symbols-outlined text-on-surface-variant transition-transform duration-200 ${!isCollapsed ? 'rotate-90' : ''}`}
+          >
+            chevron_right
+          </span>
+          <span className="material-symbols-outlined bg-surface-container-high text-on-surface p-2 rounded-lg group-hover:bg-primary-container group-hover:text-on-primary-container transition-colors">
             laptop_mac
           </span>
-          <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface">
+          <h2 className="font-headline-lg text-headline-lg font-bold text-on-surface group-hover:text-primary transition-colors">
             {deviceName}
           </h2>
           {badge && (
@@ -151,49 +249,29 @@ export function DeviceCard({
       </div>
 
       {/* Content Area: Workspaces per Browser */}
-      {filteredRoots.length === 0 ? (
-        <div className="py-12 px-6 bg-surface-container-lowest border border-surface-variant rounded-lg text-center font-body-sm text-body-sm text-on-surface-variant">
-          {resolvedEmptyMessage}
-        </div>
-      ) : (
-        <div className="space-y-10">
-          {browserGroups.map(([browserName, browserTrees]) => {
-            const workspaces = browserTrees.flatMap(extractWorkspacesFromRoot);
-            if (workspaces.length === 0) return null;
-            const browserLastUpdateTime = getBrowserLastUpdateTime(browserTrees);
-
-            return (
-              <div key={browserName} className="space-y-6">
-                {/* Section Title */}
-                <div className="flex justify-between items-end border-b border-surface-container-high pb-4">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-title-md text-title-md font-bold uppercase text-on-surface">
-                      {browserName}
-                    </h3>
-                  </div>
-                  {browserLastUpdateTime && (
-                    <span className="font-body-sm text-body-sm text-outline">
-                      Updated {formatRelativeTime(browserLastUpdateTime)}
-                    </span>
-                  )}
-                </div>
-
-                {/* Workspace Cards Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 min-[1500px]:grid-cols-5 2xl:grid-cols-5 gap-gutter items-start">
-                  {workspaces.map((wsItem, wsIndex) => (
-                    <ZenSidebarView
-                      key={wsItem.id}
-                      workspaceItem={wsItem}
-                      cardIndex={wsIndex}
-                      searchQuery={searchQuery}
-                      onOpenExternal={onOpenExternal}
-                    />
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+      {(!mounted || !isCollapsed) && (
+        filteredRoots.length === 0 ? (
+          <div className="py-12 px-6 bg-surface-container-lowest border border-surface-variant rounded-lg text-center font-body-sm text-body-sm text-on-surface-variant">
+            {resolvedEmptyMessage}
+          </div>
+        ) : (
+          <div className="space-y-10">
+            {browserGroups.map(([browserName, browserTrees]) => {
+              const browserLastUpdateTime = getBrowserLastUpdateTime(browserTrees);
+              return (
+                <BrowserSection
+                  key={browserName}
+                  deviceName={deviceName}
+                  browserName={browserName}
+                  browserTrees={browserTrees}
+                  browserLastUpdateTime={browserLastUpdateTime}
+                  searchQuery={searchQuery}
+                  onOpenExternal={onOpenExternal}
+                />
+              );
+            })}
+          </div>
+        )
       )}
     </div>
   );
