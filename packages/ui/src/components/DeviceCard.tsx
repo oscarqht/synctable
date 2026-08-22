@@ -1,4 +1,5 @@
 "use client";
+import { usePersistentCollapse } from "../hooks/usePersistentCollapse";
 
 import React, { useMemo } from "react";
 import type { BrowserTreeNode } from "../types";
@@ -11,28 +12,7 @@ import {
 } from "../utils/treeUtils";
 import { ZenSidebarView } from "./zen/ZenSidebarView";
 
-export function usePersistentCollapse(key: string, defaultCollapsed: boolean = false) {
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(defaultCollapsed);
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-    const stored = localStorage.getItem(key);
-    if (stored !== null) {
-      setIsCollapsed(stored === "true");
-    }
-  }, [key]);
-
-  const toggle = () => {
-    setIsCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem(key, String(next));
-      return next;
-    });
-  };
-
-  return { isCollapsed, toggle, mounted };
-}
 
 export interface DeviceCardProps {
   deviceName: string;

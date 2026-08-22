@@ -15,3 +15,4 @@ export * from "./components/zen/ZenSidebarView";
 export * from "./components/TreeNodeItem";
 export * from "./components/DeviceCard";
 export * from "./components/MultiDeviceCardsPortal";
+export * from "./hooks/usePersistentCollapse";
