@@ -1,4 +1,5 @@
 "use client";
+import { usePersistentCollapse } from "../../hooks/usePersistentCollapse";
 
 import React, { useState, useMemo } from "react";
 import type { BrowserTreeNode, WorkspaceItem } from "../../types";
@@ -61,6 +62,9 @@ export function ZenSidebarView({
     }
     return null;
   }, [workspaceItem, rawRootNode]);
+
+  const collapseKey = `synctable_collapse_workspace_${currentWorkspaceItem?.id || 'unknown'}`;
+  const { isCollapsed, toggle, mounted } = usePersistentCollapse(collapseKey, false);
 
   const workspaceNode = currentWorkspaceItem?.node;
 
@@ -281,8 +285,16 @@ export function ZenSidebarView({
   return (
     <div style={customBgStyle} className={containerClasses}>
       {/* Top Header */}
-      <div className="flex justify-between items-center">
+      <div
+        className="flex justify-between items-center cursor-pointer select-none group"
+        onClick={toggle}
+      >
         <div className="flex items-center gap-2 min-w-0 pr-2">
+          <span
+            className={`material-symbols-outlined transition-transform duration-200 ${!isCollapsed ? 'rotate-90' : ''}`}
+          >
+            chevron_right
+          </span>
           {currentWorkspaceItem.icon && (
             <span className="text-lg shrink-0">{currentWorkspaceItem.icon}</span>
           )}
@@ -321,7 +333,9 @@ export function ZenSidebarView({
         </div>
       </div>
 
-      {/* Card Search Bar */}
+      {(!mounted || !isCollapsed) && (
+        <>
+          {/* Card Search Bar */}
       {!externalSearch && (
         <div className="relative">
           <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 opacity-70 text-[18px] pointer-events-none">
@@ -370,6 +384,8 @@ export function ZenSidebarView({
           })
         )}
       </div>
+        </>
+      )}
     </div>
   );
 }
