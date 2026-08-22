@@ -408,21 +408,7 @@ export class RaindropClient {
     collectionId: number,
     deviceId: string
   ): Promise<void> {
-    const res = await fetch(`${this.apiBase}/raindrops/${collectionId}?perpage=50`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      signal: AbortSignal.timeout(6000),
-    });
-
-    if (!res.ok) {
-      const errorText = await res.text().catch(() => "");
-      throw new Error(`Failed to search Raindrop items in collection (${res.status}): ${errorText}`);
-    }
-
-    const data = (await res.json()) as { result?: boolean; items?: RaindropItem[] };
-    const items = data.items || [];
+    const items = await this.fetchCollectionRaindrops(token, collectionId);
 
     const targetTxtName = `${deviceId}.txt`;
     const targetJsonName = `${deviceId}.json`;
