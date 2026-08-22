@@ -60,6 +60,15 @@ function BrowserSection({
           >
             chevron_right
           </span>
+          <img
+            src={`/browser-${browserName.toLowerCase()}.png`}
+            alt={browserName}
+            className="w-5 h-5 object-contain"
+            onError={(e) => {
+              // Hide the image if the browser icon is not found
+              (e.target as HTMLImageElement).style.display = 'none';
+            }}
+          />
           <h3 className="font-title-md text-title-md font-bold uppercase text-on-surface group-hover:text-primary transition-colors">
             {browserName}
           </h3>
